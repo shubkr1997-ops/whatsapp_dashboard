@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@0.460.0"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="app-wrapper">
+        <!-- Chat List Sidebar -->
+        <aside class="chat-list-panel">
+            <header class="panel-header">
+                <div class="user-avatar-main">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User Avatar">
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" id="btnNewChat" title="New Chat"><i data-lucide="plus"></i></button>
+                    <button class="icon-btn" id="btnRefresh" title="Refresh Contacts"><i data-lucide="refresh-cw"></i></button>
+                    <button class="icon-btn" id="btnSettings" title="Settings"><i data-lucide="settings"></i></button>
+                </div>
+            </header>
+            
+            <div class="search-bar-container">
+                <div class="search-input-wrapper">
+                    <i data-lucide="search" size="18"></i>
+                    <input type="text" id="chatSearch" placeholder="Search or start a new chat">
+                </div>
+            </div>
+
+            <!-- Filter Pills -->
+            <div class="filter-pills-container">
+                <button class="filter-pill active">All</button>
+                <button class="filter-pill">Unread</button>
+                <button class="filter-pill">Favorites</button>
+                <button class="filter-pill">Groups</button>
+            </div>
+
+            <div class="chats-scroll-area" id="chatList">
+                <!-- Chats will be rendered here via JS -->
+                <div class="loading-shimmer"></div>
+            </div>
+        </aside>
+
+        <!-- Settings Drawer Panel -->
+        <aside class="settings-drawer" id="settingsDrawer">
+            <header class="settings-drawer-header">
+                <button class="icon-btn" id="closeSettings"><i data-lucide="arrow-left"></i></button>
+                <h3>Settings</h3>
+            </header>
+            <div class="settings-drawer-content">
+                <!-- Profile Card -->
+                <div class="settings-profile-card">
+                    <div class="settings-profile-avatar">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Profile">
+                        <div class="settings-profile-status"></div>
+                    </div>
+                    <div class="settings-profile-info">
+                        <h4>WhatsApp Dashboard</h4>
+                        <p>Business Account</p>
+                    </div>
+                </div>
+
+                <!-- Menu Items -->
+                <div class="settings-menu-group">
+                    <div class="settings-menu-label">Business Tools</div>
+
+                    <button class="settings-menu-item" id="settingsAIAgents">
+                        <div class="settings-menu-icon" style="background: rgba(58, 134, 255, 0.15); color: #3a86ff;">
+                            <i data-lucide="bot" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">AI Agents</span>
+                            <span class="settings-menu-sub">Configure AI models & training</span>
+                        </div>
+                        <i data-lucide="chevron-right" size="16" class="settings-menu-arrow"></i>
+                    </button>
+
+                    <button class="settings-menu-item" id="settingsCatalog">
+                        <div class="settings-menu-icon" style="background: rgba(255, 159, 67, 0.15); color: #ff9f43;">
+                            <i data-lucide="shopping-bag" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">Catalog</span>
+                            <span class="settings-menu-sub">Manage products & inventory</span>
+                        </div>
+                        <i data-lucide="chevron-right" size="16" class="settings-menu-arrow"></i>
+                    </button>
+
+                    <button class="settings-menu-item" id="settingsFlows">
+                        <div class="settings-menu-icon" style="background: rgba(46, 213, 115, 0.15); color: #2ed573;">
+                            <i data-lucide="git-branch" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">Flows</span>
+                            <span class="settings-menu-sub">Automated message workflows</span>
+                        </div>
+                        <i data-lucide="chevron-right" size="16" class="settings-menu-arrow"></i>
+                    </button>
+                </div>
+
+                <div class="settings-menu-group">
+                    <div class="settings-menu-label">Features</div>
+
+                    <button class="settings-menu-item" id="settingsCommunities">
+                        <div class="settings-menu-icon" style="background: rgba(116, 185, 255, 0.15); color: #74b9ff;">
+                            <i data-lucide="users" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">Communities</span>
+                            <span class="settings-menu-sub">Group communities together</span>
+                        </div>
+                        <span class="settings-badge-soon">Soon</span>
+                    </button>
+
+                    <button class="settings-menu-item" id="settingsStatus">
+                        <div class="settings-menu-icon" style="background: rgba(162, 155, 254, 0.15); color: #a29bfe;">
+                            <i data-lucide="circle-dashed" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">Status</span>
+                            <span class="settings-menu-sub">Share status updates</span>
+                        </div>
+                        <span class="settings-badge-soon">Soon</span>
+                    </button>
+
+                    <button class="settings-menu-item" id="settingsChannels">
+                        <div class="settings-menu-icon" style="background: rgba(253, 203, 110, 0.15); color: #fdcb6e;">
+                            <i data-lucide="message-square" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">Channels</span>
+                            <span class="settings-menu-sub">Broadcast to followers</span>
+                        </div>
+                        <span class="settings-badge-soon">Soon</span>
+                    </button>
+                </div>
+
+                <div class="settings-menu-group">
+                    <div class="settings-menu-label">System</div>
+
+                    <button class="settings-menu-item" id="settingsAdmin">
+                        <div class="settings-menu-icon" style="background: rgba(214, 48, 49, 0.12); color: #d63031;">
+                            <i data-lucide="shield" size="20"></i>
+                        </div>
+                        <div class="settings-menu-text">
+                            <span class="settings-menu-title">Admin Panel</span>
+                            <span class="settings-menu-sub">System administration & control</span>
+                        </div>
+                        <i data-lucide="chevron-right" size="16" class="settings-menu-arrow"></i>
+                    </button>
+                </div>
+
+                <div class="settings-footer">
+                    <p>WhatsApp Dashboard v1.0</p>
+                    <p>End-to-end encrypted</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Active Conversation Panel -->
+        <main class="active-conversation-panel">
+            <!-- Welcome Screen (Visible when no chat is selected) -->
+            <div id="welcomeScreen" class="welcome-screen">
+                <div class="welcome-content">
+                    <div class="welcome-illustration"></div>
+                    <h2>WhatsApp for Windows</h2>
+                    <p>Send and receive messages without keeping your phone online.<br>Use WhatsApp on up to 4 linked devices and 1 phone at the same time.</p>
+                    <span class="encryption-note"><i data-lucide="lock" size="12"></i> End-to-end encrypted</span>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="chatArea" class="chat-area hidden">
+                <header class="chat-header">
+                    <div class="chat-contact-info" id="openDetails">
+                        <button class="back-btn" id="backBtn"><i data-lucide="arrow-left"></i></button>
+                        <img src="" alt="" class="contact-avatar" id="headerAvatar">
+                        <div class="contact-details">
+                            <h3 id="headerName">Select a Chat</h3>
+                            <p id="headerStatus">click here for contact info</p>
+                        </div>
+                    </div>
+                    <div class="chat-actions">
+                        <button class="icon-btn" id="btnFavorite" title="Mark as favorite"><i data-lucide="star" size="20"></i></button>
+                        <span class="divider-vertical"></span>
+                        <button class="icon-btn" id="videoCallBtn" title="Video call"><i data-lucide="video" size="20"></i></button>
+                        <button class="icon-btn" id="voiceCallBtn" title="Voice call"><i data-lucide="phone" size="20"></i></button>
+                        <button class="icon-btn" id="simulateMsgBtn" title="Simulate incoming message"><i data-lucide="message-circle-dashed" size="20"></i></button>
+                        <span class="divider-vertical"></span>
+                        <!-- AI Mode Toggle -->
+                        <div class="mode-toggle-container" id="modeToggleContainer">
+                            <button class="mode-toggle-btn" id="modeToggleBtn" title="Toggle AI/Human mode">
+                                <i data-lucide="bot" size="18" id="modeIcon"></i>
+                                <span id="modeLabel">Human</span>
+                            </button>
+                        </div>
+                        <span class="divider-vertical"></span>
+                        <button class="icon-btn" id="chatSearchBtn" title="Search"><i data-lucide="search" size="20"></i></button>
+                        <button class="icon-btn" id="chatMenuBtn" title="Menu"><i data-lucide="more-vertical" size="20"></i></button>
+                    </div>
+                </header>
+
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Messages scroll here -->
+                </div>
+
+                <footer class="chat-footer">
+                    <div class="footer-actions-left">
+                        <div class="attachment-menu-container">
+                            <button class="icon-btn" id="plusBtn" title="Attachments"><i data-lucide="plus" size="24"></i></button>
+                            <div class="attachment-menu hidden" id="attachmentMenu">
+                                <button class="attach-item" id="imageUploadBtn"><i data-lucide="image" size="20"></i><span>Photos & Videos</span></button>
+                                <input type="file" id="imageFileInput" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">
+                                <button class="attach-item" id="videoUploadBtn"><i data-lucide="video" size="20"></i><span>Camera</span></button>
+                                <input type="file" id="videoFileInput" accept="video/mp4,video/3gpp,video/quicktime" style="display:none">
+                                <button class="attach-item"><i data-lucide="file" size="20"></i><span>Document</span></button>
+                                <button class="attach-item"><i data-lucide="user" size="20"></i><span>Contact</span></button>
+                                <button class="attach-item" id="btnSendCatalog"><i data-lucide="shopping-bag" size="20"></i><span>Send Catalog</span></button>
+                                <button class="attach-item" id="btnSendProduct"><i data-lucide="package" size="20"></i><span>Send Product</span></button>
+                                <button class="attach-item" id="btnSendFlow"><i data-lucide="git-branch" size="20"></i><span>Send Flow</span></button>
+                                <button class="attach-item"><i data-lucide="bar-chart-2" size="20"></i><span>Poll</span></button>
+                            </div>
+                        </div>
+                        <button class="icon-btn" id="btnEmoji"><i data-lucide="smile" size="24"></i></button>
+                    </div>
+                    <div class="message-input-wrapper">
+                        <textarea id="messageInput" placeholder="Type a message" rows="1"></textarea>
+                        <div id="recordingUI" class="recording-ui hidden">
+                            <div class="recording-dot"></div>
+                            <span class="recording-timer">0:00</span>
+                            <span class="recording-label">Recording...</span>
+                        </div>
+                    </div>
+                    <div class="footer-actions-right">
+                        <button class="icon-btn mic-btn" id="micBtn"><i data-lucide="mic" size="24"></i></button>
+                        <button class="send-btn hidden" id="sendBtn"><i data-lucide="send" size="24"></i></button>
+                    </div>
+                </footer>
+            </div>
+        </main>
+
+        <!-- Details Sidebar (Side Drawer) -->
+        <aside class="details-panel" id="detailsPanel">
+            <header class="panel-header details-header">
+                <button class="icon-btn" id="closeDetails"><i data-lucide="x"></i></button>
+                <h3>Contact info</h3>
+            </header>
+            <div class="details-content">
+                <div class="details-user-card">
+                    <img src="" alt="" id="detailsAvatar">
+                    <h2 id="detailsName">Contact Name</h2>
+                    <p id="detailsPhone">+123456789</p>
+                </div>
+                <!-- WhatsApp styled sections -->
+                <div class="details-section">
+                    <h4>About</h4>
+                    <p id="detailsAbout">Hey there! I am using WhatsApp.</p>
+                </div>
+                <!-- AI Agent Section in Details Panel -->
+                <div class="details-section ai-section">
+                    <h4><i data-lucide="bot" size="16"></i> AI Agent Settings</h4>
+                    <div class="ai-mode-display">
+                        <span class="ai-mode-label">Mode:</span>
+                        <span class="ai-mode-value" id="detailsModeValue">Human</span>
+                    </div>
+                    <div class="ai-mode-display" id="detailsAgentRow" style="display:none">
+                        <span class="ai-mode-label">Agent:</span>
+                        <span class="ai-mode-value" id="detailsAgentName">—</span>
+                    </div>
+                    <div class="ai-mode-display" id="detailsProviderRow" style="display:none">
+                        <span class="ai-mode-label">Provider:</span>
+                        <span class="ai-mode-value" id="detailsProviderName">—</span>
+                    </div>
+                    <div class="ai-section-actions">
+                        <button class="ai-action-btn" id="detailsToggleModeBtn">
+                            <i data-lucide="repeat" size="14"></i> Switch Mode
+                        </button>
+                        <button class="ai-action-btn" id="detailsConfigureAgentBtn">
+                            <i data-lucide="settings" size="14"></i> Configure Agent
+                        </button>
+                        <button class="ai-action-btn ai-action-danger" id="detailsClearHistoryBtn">
+                            <i data-lucide="trash-2" size="14"></i> Clear AI Memory
+                        </button>
+                    </div>
+                </div>
+                <div class="details-section">
+                    <div class="section-row">
+                        <span>Media, links, and docs</span>
+                        <i data-lucide="chevron-right" size="16"></i>
+                    </div>
+                    <div class="media-grid">
+                        <div class="media-placeholder"></div>
+                        <div class="media-placeholder"></div>
+                        <div class="media-placeholder"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Agent Configuration Modal -->
+        <div class="modal-overlay hidden" id="agentModalOverlay">
+            <div class="modal" id="agentModal">
+                <div class="modal-header">
+                    <h3 id="agentModalTitle">AI Agent Configuration</h3>
+                    <button class="icon-btn" id="closeAgentModal"><i data-lucide="x" size="20"></i></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Global: Manage Agents List -->
+                    <div class="modal-section">
+                        <h4>Agent Presets</h4>
+                        <div class="agent-presets-list" id="agentPresetsList">
+                            <!-- Rendered by JS -->
+                        </div>
+                        <button class="ai-action-btn" id="createAgentBtn">
+                            <i data-lucide="plus" size="14"></i> Create New Agent
+                        </button>
+                    </div>
+
+                    <!-- Agent Editor Form -->
+                    <div class="modal-section hidden" id="agentEditorSection">
+                        <h4 id="agentEditorTitle">Create Agent</h4>
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" id="agentName" placeholder="e.g. Support Bot v2" class="form-input">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Type</label>
+                                <select id="agentType" class="form-input">
+                                    <option value="customer_support">Customer Support</option>
+                                    <option value="sales">Sales Agent</option>
+                                    <option value="general">General Chatbot</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Provider</label>
+                                <select id="agentProvider" class="form-input">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="chatgpt">ChatGPT</option>
+                                    <option value="gemini">Gemini</option>
+                                    <option value="ollama">Ollama (Local)</option>
+                                    <option value="lmstudio">LM Studio (Local)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2">
+                                <label>Model</label>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="text" id="agentModel" placeholder="gpt-4o" class="form-input" style="flex:1">
+                                    <button class="ai-action-btn" id="btnLoadModels" title="Load available models" style="padding:8px 12px;">
+                                        <i data-lucide="refresh-cw" size="14"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Temperature</label>
+                                <input type="number" id="agentTemperature" min="0" max="2" step="0.1" value="0.7" class="form-input">
+                            </div>
+                        </div>
+                        <div class="form-group" id="baseUrlGroup" style="display:none;">
+                            <label>Base URL <span style="font-weight:400;color:var(--text-secondary)">(Local Server)</span></label>
+                            <input type="text" id="agentBaseUrl" placeholder="http://localhost:1234" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Tokens</label>
+                            <input type="number" id="agentMaxTokens" min="64" max="4096" step="64" value="1024" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label>System Prompt</label>
+                            <textarea id="agentSystemPrompt" rows="6" class="form-input form-textarea" placeholder="Define the agent's behavior and personality..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="agentIsDefault"> Set as default agent
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button class="ai-action-btn" id="saveAgentBtn">Save Agent</button>
+                            <button class="ai-action-btn ai-action-cancel" id="cancelAgentBtn">Cancel</button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Assign to Current Chat -->
+                    <div class="modal-section" id="quickAssignSection">
+                        <h4>Assign to Current Chat</h4>
+                        <div class="form-group">
+                            <label>Select Agent for this conversation</label>
+                            <select id="assignAgentSelect" class="form-input">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                        <button class="ai-action-btn" id="assignAgentBtn">
+                            <i data-lucide="check" size="14"></i> Assign & Activate AI Mode
+                        </button>
+                    </div>
+
+                    <!-- Provider Status -->
+                    <div class="modal-section">
+                        <h4>Provider Status</h4>
+                        <div class="provider-status-list" id="providerStatusList">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+
+                    <!-- AI Training Section -->
+                    <div class="modal-section" id="trainingSection">
+                        <h4><i data-lucide="book-open" size="16"></i> AI Training Data</h4>
+                        
+                        <!-- Training Files List -->
+                        <div id="trainingFilesList" style="max-height:200px;overflow-y:auto;margin-bottom:16px;">
+                            <p class="empty-text">No training data added yet.</p>
+                        </div>
+
+                        <!-- Upload PDF/CSV -->
+                        <div class="training-upload-section">
+                            <label style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;display:block;">Upload Training File (PDF/CSV)</label>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="file" id="trainingFileInput" accept=".pdf,.csv" style="display:none">
+                                <button class="ai-action-btn" id="btnUploadTraining" style="flex:1">
+                                    <i data-lucide="upload" size="14"></i> Choose File
+                                </button>
+                                <button class="ai-action-btn" id="btnConfirmUpload" disabled>
+                                    <i data-lucide="check" size="14"></i> Upload
+                                </button>
+                            </div>
+                            <p id="trainingFileName" style="font-size:12px;color:var(--text-secondary);margin-top:6px;"></p>
+                        </div>
+
+                        <!-- Google Sheets Integration -->
+                        <div class="training-sheet-section" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--glass-border);">
+                            <label style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;display:block;"><i data-lucide="table" size="14"></i> Google Sheets</label>
+                            <div class="form-group">
+                                <label>Sheet URL</label>
+                                <input type="text" id="sheetUrl" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/...">
+                            </div>
+                            <div class="form-group">
+                                <label>Sheet Name (optional)</label>
+                                <input type="text" id="sheetName" class="form-input" placeholder="Sheet1">
+                            </div>
+                            <div class="form-group">
+                                <label>Service Account JSON</label>
+                                <textarea id="sheetCredentials" rows="3" class="form-input form-textarea" placeholder='{"type":"service_account",...}'></textarea>
+                            </div>
+                            <button class="ai-action-btn" id="btnAddGoogleSheet">
+                                <i data-lucide="plus" size="14"></i> Add Google Sheet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Send Flow Modal (from chat) -->
+    <div class="modal-overlay hidden" id="chatFlowModal">
+        <div class="modal" style="width:480px;max-width:95vw">
+            <div class="modal-header">
+                <h3>Send Flow</h3>
+                <button class="icon-btn" id="closeChatFlowModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Flow</label>
+                    <select id="chatFlowSelect" class="form-input">
+                        <option value="">-- Loading flows... --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Header Text (optional)</label>
+                    <input type="text" id="chatFlowHeader" class="form-input" placeholder="e.g. Quick Survey">
+                </div>
+                <div class="form-group">
+                    <label>Body Text</label>
+                    <input type="text" id="chatFlowBody" class="form-input" value="Please fill out this form" placeholder="Body text">
+                </div>
+                <div class="form-group">
+                    <label>Button Text</label>
+                    <input type="text" id="chatFlowCTA" class="form-input" value="Start" placeholder="e.g. Start">
+                </div>
+                <div class="form-actions">
+                    <button class="ai-action-btn" id="btnChatFlowSend" disabled>
+                        <i data-lucide="send" size="14"></i> Send Flow
+                    </button>
+                    <button class="ai-action-btn ai-action-cancel" id="btnChatFlowCancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catalog Send Modal (from chat) -->
+    <div class="modal-overlay hidden" id="chatCatalogModal">
+        <div class="modal" style="width:520px;max-width:95vw">
+            <div class="modal-header">
+                <h3 id="chatCatalogModalTitle">Send Catalog</h3>
+                <button class="icon-btn" id="closeChatCatalogModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Catalog</label>
+                    <select id="chatCatalogSelect" class="form-input">
+                        <option value="">-- Loading catalogs... --</option>
+                    </select>
+                </div>
+                <div id="chatCatalogProductsSection" class="hidden">
+                    <div class="form-group">
+                        <label>Search Products</label>
+                        <input type="text" id="chatCatalogSearch" class="form-input" placeholder="Search...">
+                    </div>
+                    <div id="chatCatalogProductList" style="max-height:250px;overflow-y:auto;border:1px solid var(--glass-border);border-radius:12px;padding:8px">
+                        <!-- Products rendered here -->
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:14px">
+                    <label>Message (optional)</label>
+                    <input type="text" id="chatCatalogMessage" class="form-input" placeholder="Check out our products!">
+                </div>
+                <div class="form-actions">
+                    <button class="ai-action-btn" id="btnChatCatalogSend" disabled>
+                        <i data-lucide="send" size="14"></i> <span id="chatCatalogSendLabel">Send</span>
+                    </button>
+                    <button class="ai-action-btn ai-action-cancel" id="btnChatCatalogCancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+
+    <!-- Call Modal -->
+    <div id="callModal" class="call-modal">
+        <div class="call-modal-content">
+            <div class="call-header">
+                <div class="caller-info">
+                    <img id="callerAvatar" src="" alt="Caller">
+                    <div>
+                        <h3 id="callerName">Calling...</h3>
+                        <p id="callStatus">Ringing...</p>
+                    </div>
+                </div>
+                <button id="endCallBtn" class="end-call-btn">
+                    <i data-lucide="phone-off"></i>
+                </button>
+            </div>
+            <div class="call-video-container">
+                <video id="localVideo" autoplay muted></video>
+                <video id="remoteVideo" autoplay></video>
+                <div id="callControls" class="call-controls">
+                    <button id="muteBtn" class="call-control-btn">
+                        <i data-lucide="mic"></i>
+                    </button>
+                    <button id="videoBtn" class="call-control-btn">
+                        <i data-lucide="video"></i>
+                    </button>
+                    <button id="speakerBtn" class="call-control-btn">
+                        <i data-lucide="volume-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

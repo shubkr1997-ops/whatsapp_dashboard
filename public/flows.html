@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flows — WhatsApp Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.460.0"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="flows.css">
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="app-wrapper flows-layout">
+        <!-- Sidebar -->
+        <aside class="chat-list-panel">
+            <header class="panel-header">
+                <div class="user-avatar-main">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User Avatar">
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" onclick="window.location.href='index.html'" title="Back to Chats"><i data-lucide="arrow-left"></i></button>
+                    <button class="icon-btn active-nav" title="Flows"><i data-lucide="git-branch"></i></button>
+                </div>
+            </header>
+            <div class="search-bar-container">
+                <div class="search-input-wrapper">
+                    <i data-lucide="search" size="18"></i>
+                    <input type="text" id="flowSearch" placeholder="Search flows...">
+                </div>
+            </div>
+            <div class="flows-sidebar-actions">
+                <button class="flow-btn flow-btn-primary flow-btn-full" id="btnCreateFlow">
+                    <i data-lucide="plus" size="16"></i> New Blank Flow
+                </button>
+            </div>
+            <div class="flows-sidebar-actions" style="padding-top:0">
+                <button class="flow-btn flow-btn-outline flow-btn-full" id="btnFromTemplate">
+                    <i data-lucide="layout-template" size="16"></i> From Template
+                </button>
+            </div>
+            <div class="chats-scroll-area" id="flowsList">
+                <!-- Flow list rendered here -->
+                <div class="flow-list-empty">No flows yet</div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flows-main">
+            <!-- Welcome -->
+            <div id="flowsWelcome" class="flows-welcome">
+                <div class="flows-welcome-content">
+                    <i data-lucide="git-branch" size="56"></i>
+                    <h2>Meta Flows</h2>
+                    <p>Create interactive forms and menus for your WhatsApp chatbot. Flows let you collect information, show product options, and automate conversations.</p>
+                    <button class="flow-btn flow-btn-primary" id="btnCreateFlowWelcome">
+                        <i data-lucide="plus" size="16"></i> Create Your First Flow
+                    </button>
+                </div>
+            </div>
+
+            <!-- Flow Editor -->
+            <div id="flowEditor" class="flow-editor hidden">
+                <header class="flow-editor-header">
+                    <div class="flow-editor-header-left">
+                        <button class="icon-btn" id="btnBackToFlows"><i data-lucide="arrow-left" size="20"></i></button>
+                        <input type="text" id="flowEditorName" class="flow-name-input" value="Untitled Flow" placeholder="Flow name">
+                        <span class="flow-status-badge" id="flowStatusBadge">DRAFT</span>
+                    </div>
+                    <div class="flow-editor-header-actions">
+                        <button class="flow-btn flow-btn-outline" id="btnPreviewFlow">
+                            <i data-lucide="eye" size="16"></i> Preview
+                        </button>
+                        <button class="flow-btn flow-btn-outline" id="btnPublishFlow">
+                            <i data-lucide="upload" size="16"></i> Publish
+                        </button>
+                        <button class="flow-btn flow-btn-danger" id="btnDeleteFlow">
+                            <i data-lucide="trash-2" size="16"></i>
+                        </button>
+                        <button class="flow-btn flow-btn-primary" id="btnSaveFlow">
+                            <i data-lucide="save" size="16"></i> Save
+                        </button>
+                    </div>
+                </header>
+
+                <div class="flow-editor-body">
+                    <!-- Flow Settings -->
+                    <div class="flow-editor-panel flow-settings-panel">
+                        <h4>Flow Settings</h4>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea id="flowDescription" class="form-input form-textarea" rows="2" placeholder="Describe what this flow does..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="flowCategory" class="form-input">
+                                <option value="CUSTOMER_SUPPORT">Customer Support</option>
+                                <option value="SIGN_UP">Sign Up</option>
+                                <option value="LEAD_GENERATION">Lead Generation</option>
+                                <option value="APPOINTMENT_BOOKING">Appointment Booking</option>
+                                <option value="CONTACT_US">Contact Us</option>
+                                <option value="CUSTOM">Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Meta Flow ID (if published)</label>
+                            <input type="text" id="flowMetaId" class="form-input" placeholder="Auto-filled on publish">
+                        </div>
+                    </div>
+
+                    <!-- Screen Builder -->
+                    <div class="flow-editor-panel flow-screens-panel">
+                        <div class="flow-screens-header">
+                            <h4>Screens</h4>
+                            <button class="flow-btn flow-btn-sm flow-btn-outline" id="btnAddScreen">
+                                <i data-lucide="plus" size="14"></i> Add Screen
+                            </button>
+                        </div>
+                        <div class="flow-screens-list" id="flowScreensList">
+                            <!-- Screens rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Screen Editor -->
+                    <div class="flow-editor-panel flow-screen-editor hidden" id="screenEditor">
+                        <div class="screen-editor-header">
+                            <h4 id="screenEditorTitle">Edit Screen</h4>
+                            <button class="icon-btn" id="btnCloseScreenEditor"><i data-lucide="x" size="16"></i></button>
+                        </div>
+                        <div class="form-group">
+                            <label>Screen ID</label>
+                            <input type="text" id="screenId" class="form-input" placeholder="e.g. QUESTION_ONE">
+                        </div>
+                        <div class="form-group">
+                            <label>Screen Title</label>
+                            <input type="text" id="screenTitle" class="form-input" placeholder="e.g. Welcome">
+                        </div>
+                        <div class="screen-components-header">
+                            <label>Components</label>
+                            <div class="screen-component-add">
+                                <select id="addComponentType" class="form-input" style="width:auto;padding:6px 10px;font-size:12px">
+                                    <option value="TextHeading">Heading</option>
+                                    <option value="TextSubheading">Subheading</option>
+                                    <option value="TextBody">Body Text</option>
+                                    <option value="TextInput">Text Input</option>
+                                    <option value="TextArea">Text Area</option>
+                                    <option value="DatePicker">Date Picker</option>
+                                    <option value="Dropdown">Dropdown</option>
+                                    <option value="CheckboxGroup">Checkbox Group</option>
+                                    <option value="RadioButtonsGroup">Radio Buttons</option>
+                                    <option value="Footer">Footer Button</option>
+                                </select>
+                                <button class="flow-btn flow-btn-sm flow-btn-primary" id="btnAddComponent">
+                                    <i data-lucide="plus" size="12"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                        <div class="screen-components-list" id="screenComponentsList">
+                            <!-- Components rendered here -->
+                        </div>
+                        <div class="form-actions" style="margin-top:14px">
+                            <button class="flow-btn flow-btn-primary" id="btnSaveScreen">
+                                <i data-lucide="check" size="14"></i> Save Screen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Responses View -->
+            <div id="flowResponses" class="flow-responses hidden">
+                <header class="flow-editor-header">
+                    <div class="flow-editor-header-left">
+                        <button class="icon-btn" id="btnBackFromResponses"><i data-lucide="arrow-left" size="20"></i></button>
+                        <h3 id="responsesFlowName">Flow Responses</h3>
+                    </div>
+                    <div class="flow-editor-header-actions">
+                        <button class="flow-btn flow-btn-outline" id="btnViewEditor">
+                            <i data-lucide="pencil" size="16"></i> Edit Flow
+                        </button>
+                    </div>
+                </header>
+                <div class="flow-responses-body" id="flowResponsesBody">
+                    <!-- Responses rendered here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Send Flow Modal -->
+    <div class="modal-overlay hidden" id="sendFlowModal">
+        <div class="modal" style="width:480px;max-width:95vw">
+            <div class="modal-header">
+                <h3>Send Flow</h3>
+                <button class="icon-btn" id="closeSendFlowModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Flow</label>
+                    <select id="sendFlowSelect" class="form-input">
+                        <option value="">-- Select a flow --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Select Contact</label>
+                    <select id="sendFlowContact" class="form-input">
+                        <option value="">-- Select a contact --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Header Text (optional)</label>
+                    <input type="text" id="sendFlowHeader" class="form-input" placeholder="e.g. Quick Survey">
+                </div>
+                <div class="form-group">
+                    <label>Body Text</label>
+                    <input type="text" id="sendFlowBody" class="form-input" placeholder="Please fill out this form">
+                </div>
+                <div class="form-group">
+                    <label>Button Text</label>
+                    <input type="text" id="sendFlowCTA" class="form-input" value="Start" placeholder="e.g. Start">
+                </div>
+                <div class="form-actions">
+                    <button class="flow-btn flow-btn-primary" id="btnConfirmSendFlow">
+                        <i data-lucide="send" size="14"></i> Send Flow
+                    </button>
+                    <button class="flow-btn flow-btn-outline" id="btnCancelSendFlow">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Template Selection Modal -->
+    <div class="modal-overlay hidden" id="templateModal">
+        <div class="modal" style="width:560px;max-width:95vw">
+            <div class="modal-header">
+                <h3>Choose a Template</h3>
+                <button class="icon-btn" id="closeTemplateModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="templates-grid" id="templatesGrid">
+                    <!-- Templates rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="flows.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

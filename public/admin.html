@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Control Panel | WhatsApp Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .admin-form-container {
+            padding: 24px 40px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .admin-header {
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-secondary);
+            gap: 16px;
+        }
+        .empty-state i {
+            color: var(--glass-border-bright);
+        }
+        .ai-action-btn.primary {
+            background: rgba(58, 134, 255, 0.2);
+            border-color: rgba(58, 134, 255, 0.5);
+            color: var(--accent-vibrant);
+        }
+        .ai-action-btn.primary:hover {
+            background: rgba(58, 134, 255, 0.3);
+        }
+        .agent-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+        .agent-list-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            padding-left: 20px;
+        }
+        .agent-list-item.selected {
+            background: rgba(58, 134, 255, 0.15);
+            border-left: 4px solid var(--accent-vibrant);
+        }
+        .agent-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--glass-bg-accent);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 12px;
+            color: var(--accent-vibrant);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    
+    <div class="app-wrapper">
+        <!-- Sidebar: Agent List -->
+        <aside class="chat-list-panel" style="width: 350px;">
+            <header class="panel-header">
+                <button class="icon-btn" id="btnBackToDashboard" title="Back to Dashboard">
+                    <i data-lucide="arrow-left"></i>
+                </button>
+                <h2 style="font-size: 16px; font-weight: 600; text-align: center; flex: 1;">AI Agents</h2>
+                <button class="icon-btn" id="btnCreateNew" title="Create New Agent">
+                    <i data-lucide="plus"></i>
+                </button>
+            </header>
+            
+            <div class="chats-scroll-area" id="agentListContainer">
+                <!-- Populated by JS -->
+            </div>
+        </aside>
+
+        <!-- Main Panel: Agent Editor -->
+        <main class="active-conversation-panel" id="mainPanel">
+            
+            <!-- Welcome state -->
+            <div id="noAgentSelected" class="empty-state">
+                <br>
+                <i data-lucide="bot" size="80" style="opacity: 0.5;"></i>
+                <h2 style="font-size: 24px; color: var(--text-primary); margin-top: 10px;">Select an Agent</h2>
+                <p>Train your models, establish system prompts, or create a brand new intelligence.</p>
+                <div style="margin-top: 20px;">
+                    <button class="ai-action-btn primary" id="btnWelcomeCreate" style="padding: 12px 24px; font-size: 15px;">
+                        <i data-lucide="plus" size="18" style="margin-right: 8px;"></i> Build New Agent
+                    </button>
+                </div>
+            </div>
+
+            <!-- Form state -->
+            <div id="agentEditor" class="hidden" style="display: flex; flex-direction: column; height: 100%;">
+                <div class="admin-header">
+                    <div>
+                        <h2 id="formTitle">Edit Agent</h2>
+                        <p id="formSubtitle" style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Customize configuration and training logic.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="ai-action-btn ai-action-danger" id="btnDeleteAgent">Delete</button>
+                        <button class="ai-action-btn primary" id="btnSaveAgent">Save Changes</button>
+                    </div>
+                </div>
+
+                <div class="admin-form-container">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Agent Name</label>
+                            <input type="text" id="agentName" class="form-input" placeholder="e.g. Sales Expert Bot">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Agent Type Class</label>
+                            <select id="agentType" class="form-input">
+                                <!-- JS Populated -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>AI Provider</label>
+                            <select id="agentProvider" class="form-input">
+                                <!-- JS Populated -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Model Engine <span id="loadModelsBtn" style="cursor:pointer;color:var(--accent-vibrant);font-size:11px;">(Load Models)</span></label>
+                            <input type="text" id="agentModel" class="form-input" placeholder="e.g. gpt-4o">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" id="baseUrlGroup" style="display:none;">
+                        <label>Base URL <span style="font-size: 11px; opacity: 0.6;">(Local Server)</span></label>
+                        <input type="text" id="agentBaseUrl" class="form-input" placeholder="http://localhost:1234">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Temperature (Creativity: 0.0 to 1.0)</label>
+                            <input type="number" id="agentTemperature" class="form-input" min="0" max="1" step="0.1" value="0.7">
+                        </div>
+                        <div class="form-group">
+                            <label>Max Context Tokens</label>
+                            <input type="number" id="agentMaxTokens" class="form-input" min="100" max="8000" step="100" value="1024">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="flex: 1; display: flex; flex-direction: column;">
+                        <label>AI Training / System Prompt</label>
+                        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Provide deep instructions on personality, responses, boundary cases, and knowledge base handling.</p>
+                        <textarea id="agentSystemPrompt" class="form-input form-textarea" style="flex: 1; min-height: 250px;" placeholder="You are a helpful assistant..."></textarea>
+                    </div>
+                </div>
+
+                <!-- MCP Servers Integration -->
+                <div class="admin-form-container" style="margin-top: 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h3 style="font-size: 15px; margin-bottom: 4px;">External Tools & Integrations (MCP)</h3>
+                            <p style="font-size: 13px; color: var(--text-secondary);">Give your AI the ability to read/write from specific external services.</p>
+                        </div>
+                        <button class="ai-action-btn" id="btnAddGoogleSheetMcp" style="border-radius:20px; padding:6px 14px; font-size:12px;">
+                            <i data-lucide="table" size="14"></i> Add Google Sheet
+                        </button>
+                    </div>
+                    
+                    <div id="mcpServersList" style="margin-top: 16px; display:flex; flex-direction:column; gap:8px;">
+                        <!-- JS Populated list of attached MCP servers -->
+                    </div>
+                </div>
+            </div>
+            
+        </main>
+    </div>
+
+    <!-- MCP Add Modal -->
+    <div class="modal-overlay hidden" id="mcpGoogleSheetModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Google Sheet Tool</h3>
+                <button class="icon-btn" id="closeMcpModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Integration Name</label>
+                    <input type="text" id="mcpSheetName" class="form-input" placeholder="e.g. Leads Database">
+                </div>
+                <div class="form-group">
+                    <label>Sheet URL</label>
+                    <input type="text" id="mcpSheetUrl" class="form-input" placeholder="https://docs.google.com/spreadsheets/d/...">
+                </div>
+                <div class="form-group">
+                    <label>Service Account Credentials JSON</label>
+                    <textarea id="mcpSheetCreds" class="form-input form-textarea" rows="4" placeholder='{"type":"service_account",...}'></textarea>
+                </div>
+                <div class="form-row" style="margin-top:16px;">
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="mcpSheetRead" checked> Allow AI to read data
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="mcpSheetWrite"> Allow AI to write/append data
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top:24px;">
+                    <button class="ai-action-btn primary" id="btnSaveMcpSheet">Save Integration</button>
+                    <button class="ai-action-btn" id="btnCancelMcpSheet">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="admin.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catalog — WhatsApp Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@0.460.0"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="catalog.css">
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="app-wrapper catalog-layout">
+        <!-- Sidebar (same as main dashboard) -->
+        <aside class="chat-list-panel">
+            <header class="panel-header">
+                <div class="user-avatar-main">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User Avatar">
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" onclick="window.location.href='index.html'" title="Back to Chats"><i data-lucide="arrow-left"></i></button>
+                    <button class="icon-btn active-nav" title="Catalog"><i data-lucide="shopping-bag"></i></button>
+                </div>
+            </header>
+            <div class="search-bar-container">
+                <div class="search-input-wrapper">
+                    <i data-lucide="search" size="18"></i>
+                    <input type="text" id="productSearch" placeholder="Search products...">
+                </div>
+            </div>
+            <div class="chats-scroll-area" id="contactListForSend">
+                <div class="contact-list-header">
+                    <span>Select contact to send products</span>
+                </div>
+                <!-- Contact list rendered here -->
+            </div>
+        </aside>
+
+        <!-- Main Catalog Area -->
+        <main class="catalog-main">
+            <header class="catalog-header">
+                <div class="catalog-header-left">
+                    <h2><i data-lucide="shopping-bag" size="22"></i> Catalog</h2>
+                </div>
+                <div class="catalog-header-actions">
+                    <button class="catalog-btn catalog-btn-outline" id="btnConnectCatalog">
+                        <i data-lucide="link" size="16"></i> Connect Catalog
+                    </button>
+                    <button class="catalog-btn catalog-btn-outline" id="btnSyncProducts" disabled>
+                        <i data-lucide="refresh-cw" size="16"></i> Sync Products
+                    </button>
+                </div>
+            </header>
+
+            <!-- Connection Section -->
+            <div class="catalog-section" id="connectionSection">
+                <div class="catalog-connect-card">
+                    <div class="catalog-dropdown-row">
+                        <label>Select Catalog</label>
+                        <select id="catalogSelect" class="catalog-select">
+                            <option value="">-- Choose a catalog --</option>
+                        </select>
+                        <button class="catalog-btn catalog-btn-primary" id="btnLoadCatalog" disabled>
+                            <i data-lucide="check" size="16"></i> Load
+                        </button>
+                    </div>
+                    <div class="catalog-status" id="catalogStatus">
+                        <span class="status-dot disconnected"></span>
+                        <span>No catalog connected</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div class="catalog-section">
+                <div class="catalog-section-header">
+                    <h3>Products</h3>
+                    <span id="productCount" class="product-count">0 items</span>
+                </div>
+                <div class="products-grid" id="productsGrid">
+                    <!-- Empty state -->
+                    <div class="catalog-empty-state" id="emptyState">
+                        <i data-lucide="package" size="48"></i>
+                        <h3>No Products</h3>
+                        <p>Connect a catalog and sync products to see them here.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading overlay -->
+            <div class="catalog-loading hidden" id="loadingOverlay">
+                <div class="spinner"></div>
+                <span>Loading...</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- Send Product Modal -->
+    <div class="modal-overlay hidden" id="sendProductModal">
+        <div class="modal catalog-modal">
+            <div class="modal-header">
+                <h3>Send Product</h3>
+                <button class="icon-btn" id="closeSendProductModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="send-product-preview" id="sendProductPreview">
+                    <img src="" alt="" id="sendProductImg">
+                    <div class="send-product-info">
+                        <strong id="sendProductName"></strong>
+                        <span id="sendProductPrice"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Select Contact</label>
+                    <select id="sendProductContact" class="form-input">
+                        <option value="">-- Select a contact --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Message (optional)</label>
+                    <input type="text" id="sendProductMessage" class="form-input" placeholder="Check out this product!">
+                </div>
+                <div class="form-actions">
+                    <button class="catalog-btn catalog-btn-primary" id="btnConfirmSendProduct">
+                        <i data-lucide="send" size="14"></i> Send Product
+                    </button>
+                    <button class="catalog-btn catalog-btn-outline" id="btnCancelSendProduct">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Send Catalog Modal -->
+    <div class="modal-overlay hidden" id="sendCatalogModal">
+        <div class="modal catalog-modal">
+            <div class="modal-header">
+                <h3>Send Catalog</h3>
+                <button class="icon-btn" id="closeSendCatalogModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Contact</label>
+                    <select id="sendCatalogContact" class="form-input">
+                        <option value="">-- Select a contact --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Header Text</label>
+                    <input type="text" id="sendCatalogHeader" class="form-input" value="Our Products" placeholder="Header text">
+                </div>
+                <div class="form-group">
+                    <label>Body Text</label>
+                    <input type="text" id="sendCatalogBody" class="form-input" value="Choose from our catalog" placeholder="Body text">
+                </div>
+                <div class="form-actions">
+                    <button class="catalog-btn catalog-btn-primary" id="btnConfirmSendCatalog">
+                        <i data-lucide="send" size="14"></i> Send Catalog
+                    </button>
+                    <button class="catalog-btn catalog-btn-outline" id="btnCancelSendCatalog">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="catalog.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
