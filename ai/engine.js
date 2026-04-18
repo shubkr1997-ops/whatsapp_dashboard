@@ -55,13 +55,13 @@ const AGENT_PROMPTS = {
  * @param {string} mediaMime - The MIME type of the media (if any)
  * @returns {Promise<Object|null>} The saved outgoing message or null if human mode
  */
-async function processIncomingMessage(contactId, incomingText, contact, io, mediaUrl = null, mediaMime = null) {
+async async function processIncomingMessage(contactId, incomingText, contact, io, mediaUrl = null, mediaMime = null) {
     // Check conversation mode
-    let modeRow = db.getConversationMode(contactId);
+    let modeRow = await db.getConversationMode(contactId);
 
     // Default to human mode if no mode row exists
     if (!modeRow) {
-        db.setConversationMode({ contact_id: contactId, mode: 'human', agent_config_id: null });
+        await db.setConversationMode({ contact_id: contactId, mode: 'human', agent_config_id: null });
         return null;
     }
 
@@ -70,10 +70,10 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
     // Get agent config (from conversation_modes join or default)
     let agentConfig = null;
     if (modeRow.agent_config_id) {
-        agentConfig = db.getAgentConfigById(modeRow.agent_config_id);
+        agentConfig = await db.getAgentConfigById(modeRow.agent_config_id);
     }
     if (!agentConfig) {
-        agentConfig = db.getDefaultAgentConfig();
+        agentConfig = await db.getDefaultAgentConfig();
     }
     if (!agentConfig) {
         console.error('[AI Engine] No agent config found for contact', contactId);
@@ -85,10 +85,10 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
         const systemPrompt = agentConfig.system_prompt || AGENT_PROMPTS[agentConfig.agent_type] || AGENT_PROMPTS.general;
 
         // Add incoming message to history
-        db.addToHistory({ contact_id: contactId, role: 'user', content: incomingText });
+        await db.addToHistory({ contact_id: contactId, role: 'user', content: incomingText });
 
         // Get history
-        const history = db.getConversationHistory(contactId);
+        const history = await db.getConversationHistory(contactId);
 
         // Build messages array
         const messages = [
@@ -115,24 +115,24 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
 
         // Trim history if too long
         if (history.length > MAX_HISTORY_TURNS * 2) {
-            db.trimHistory(contactId, MAX_HISTORY_TURNS * 2);
+            await db.trimHistory(contactId, MAX_HISTORY_TURNS * 2);
         }
 
         // Emit typing indicator
         if (io) {
-            io.to(`chat_${contactId}`).emit('ai_typing', { contactId, typing: true });
+            /* io.to.emit removed */
         }
 
         // Safety timeout to force-clear typing indicator if AI hangs
         let typingTimeout = null;
         if (io) {
             typingTimeout = setTimeout(() => {
-                io.to(`chat_${contactId}`).emit('ai_typing', { contactId, typing: false });
+                /* io.to.emit removed */
             }, 35000);
         }
 
         // Get MCP Servers for this agent
-        const mcpServers = db.getMcpServersByAgent(agentConfig.id) || [];
+        const mcpServers = await db.getMcpServersByAgent(agentConfig.id) || [];
 
         // Generate AI response
         const aiReply = await generateChatCompletion({
@@ -148,7 +148,7 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
         // Clear fallback timeout and stop typing indicator
         if (typingTimeout) clearTimeout(typingTimeout);
         if (io) {
-            io.to(`chat_${contactId}`).emit('ai_typing', { contactId, typing: false });
+            /* io.to.emit removed */
         }
 
         // Check for handover signal (AI says to transfer to human)
@@ -157,14 +157,14 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
 
         if (shouldHandover && modeRow.auto_handover) {
             // Switch mode BEFORE saving — don't save the raw AI reply
-            db.setConversationMode({ contact_id: contactId, mode: 'human', agent_config_id: modeRow.agent_config_id, auto_handover: modeRow.auto_handover });
+            await db.setConversationMode({ contact_id: contactId, mode: 'human', agent_config_id: modeRow.agent_config_id, auto_handover: modeRow.auto_handover });
             if (io) io.emit('mode_changed', { contactId, mode: 'human', agentName: modeRow.agent_name });
 
             // Save a brief handover message to history (not the full AI reply)
-            db.addToHistory({ contact_id: contactId, role: 'assistant', content: '[Handover triggered] Transferring to human agent.' });
+            await db.addToHistory({ contact_id: contactId, role: 'assistant', content: '[Handover triggered] Transferring to human agent.' });
 
             // Send a clean handover message to the user
-            const handoverMsg = db.addMessage({
+            const handoverMsg = await db.addMessage({
                 contact_id: contactId,
                 type: 'outgoing',
                 text: 'Let me connect you with a human agent who can help you further.',
@@ -174,10 +174,10 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
         }
 
         // Save AI reply to history
-        db.addToHistory({ contact_id: contactId, role: 'assistant', content: aiReply });
+        await db.addToHistory({ contact_id: contactId, role: 'assistant', content: aiReply });
 
         // Save as outgoing message
-        const savedMsg = db.addMessage({
+        const savedMsg = await db.addMessage({
             contact_id: contactId,
             type: 'outgoing',
             text: aiReply,
@@ -191,7 +191,7 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
 
         // Stop typing indicator on error
         if (io) {
-            io.to(`chat_${contactId}`).emit('ai_typing', { contactId, typing: false });
+            /* io.to.emit removed */
         }
 
         return null;

@@ -1,5 +1,43 @@
 'use strict';
 
+// ─── Firebase Configuration ────────────────────────────────────────────────────
+
+const IS_PRODUCTION = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+const FUNCTIONS_REGION = 'us-central1';
+const PROJECT_ID = 'whatsappdashboard-bfa45';
+
+// API base URL
+const API_BASE = IS_PRODUCTION
+    ? `https://${FUNCTIONS_REGION}-${PROJECT_ID}.cloudfunctions.net`
+    : '';
+
+// Utility function for API calls
+async function apiCall(endpoint, options = {}) {
+    const url = IS_PRODUCTION ? `${API_BASE}${endpoint}` : endpoint;
+    const config = {
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        },
+        ...options
+    };
+
+    // Add Firebase Auth token if user is authenticated
+    if (window.auth && window.auth.currentUser) {
+        const token = await window.auth.currentUser.getIdToken();
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`API Error: ${response.status} ${error}`);
+    }
+
+    return response.json();
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let contacts      = [];
@@ -100,23 +138,14 @@ let editingAgentId = null; // null = creating new, number = editing existing
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
 
-const socket = io();
 
-socket.on('connect', () => {
-    console.log('[Socket] Connected:', socket.id);
-    if (activeChatId) socket.emit('join_chat', activeChatId);
-});
+/* socket event removed */
 
-socket.on('disconnect', () => {
-    console.log('[Socket] Disconnected');
-});
+/* socket event removed */
 
-socket.on('connect_error', (error) => {
-    console.error('[Socket] Connection error:', error);
-});
+/* socket event removed */
 
-socket.on('new_message', ({ contactId, message }) => {
-    console.log('[Socket] New message received:', { contactId, message });
+/* socket event removed */
 
     const contact = contacts.find(c => c.id === contactId);
     console.log('[Socket] Found contact:', contact);
@@ -140,79 +169,23 @@ socket.on('new_message', ({ contactId, message }) => {
     sortAndRenderChatList();
 });
 
-socket.on('contact_updated', ({ id, lastMessage, time, unread, is_favorite }) => {
-    const contact = contacts.find(c => c.id === id);
-    if (!contact) return;
- 
-    if (lastMessage !== undefined) contact.lastMessage = lastMessage;
-    if (time        !== undefined) contact.time        = time;
-    if (is_favorite !== undefined) contact.is_favorite = is_favorite;
- 
-    if (unread === 0) {
-        contact.unread   = 0;
-        unreadCounts[id] = 0;
-    } else if (unread === '+1') {
-        contact.unread   = (contact.unread || 0) + 1;
-        unreadCounts[id] = contact.unread;
-    } else if (typeof unread === 'number') {
-        contact.unread   = unread;
-        unreadCounts[id] = unread;
-    }
- 
-    updateChatCard(id);
-    if (id === activeChatId && is_favorite !== undefined) {
-        updateFavoriteUI(is_favorite);
-    }
-});
+/* socket event removed */
 
-socket.on('new_contact', (newContact) => {
-    console.log('[Socket] New contact received:', newContact);
-    contacts.unshift(newContact);
-    unreadCounts[newContact.id] = newContact.unread || 0;
-    sortAndRenderChatList();
-    console.log('[Socket] Contact list updated, total contacts:', contacts.length);
-    // Force refresh the chat list display
-    const chatListElement = document.getElementById('chatList');
-    if (chatListElement) {
-        chatListElement.innerHTML = '';
-        sortAndRenderChatList();
-    }
-});
+/* socket event removed */
 
-socket.on('message_status', ({ msgId, status }) => {
-    const bubble = document.querySelector(`.message[data-msg-id="${msgId}"] .msg-status`);
-    if (bubble) bubble.textContent = statusIcon(status);
-});
+/* socket event removed */
 
 // AI typing indicator
-socket.on('ai_typing', ({ contactId, typing }) => {
-    if (contactId !== activeChatId) return;
-    const existing = document.getElementById('aiTypingIndicator');
-    if (typing && !existing) {
-        const div = document.createElement('div');
-        div.id = 'aiTypingIndicator';
-        div.className = 'message incoming ai-typing';
-        div.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span> AI is typing...';
-        messagesContainer.appendChild(div);
-        scrollToBottom();
-    } else if (!typing && existing) {
-        existing.remove();
-    }
-});
+/* socket event removed */
 
 // Mode changed event
-socket.on('mode_changed', ({ contactId, mode, agentName }) => {
-    if (contactId === activeChatId) {
-        updateModeUI(mode, agentName);
-    }
-});
+/* socket event removed */
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
     try {
-        const res = await fetch('/api/contacts');
-        contacts  = await res.json();
+        contacts = await apiCall('/api/contacts');
         contacts.forEach(c => { unreadCounts[c.id] = c.unread || 0; });
         sortAndRenderChatList();
         setupEventListeners();
@@ -300,18 +273,17 @@ function updateChatCard(contactId) {
 // ─── Select a Chat ────────────────────────────────────────────────────────────
 
 async function selectChat(id) {
-    if (activeChatId && activeChatId !== id) socket.emit('leave_chat', activeChatId);
+    if (activeChatId && activeChatId !== id) /* socket.emit removed */
 
     activeChatId = id;
-    socket.emit('join_chat', id);
+    /* socket.emit removed */
 
     document.querySelectorAll('.chat-card').forEach(c => c.classList.remove('active'));
     const activeCard = chatList.querySelector(`.chat-card[data-contact-id="${id}"]`);
     if (activeCard) activeCard.classList.add('active');
 
     try {
-        const res     = await fetch(`/api/contacts/${id}`);
-        const contact = await res.json();
+        const contact = await apiCall(`/api/contacts/${id}`);
 
         const idx = contacts.findIndex(c => c.id === id);
         if (idx !== -1) {
@@ -982,13 +954,10 @@ async function sendMessage() {
     updateInputButtons();
 
     try {
-        const res = await fetch(`/api/contacts/${activeChatId}/messages`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ text }),
+        await apiCall(`/api/contacts/${activeChatId}/messages`, {
+            method: 'POST',
+            body: JSON.stringify({ text }),
         });
-
-        if (!res.ok) throw new Error(await res.text());
 
     } catch (err) {
         console.error('[sendMessage] Error:', err);
@@ -1689,10 +1658,7 @@ function createPeerConnection() {
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             console.log('[Call] Sending ICE candidate');
-            socket.emit('call_ice_candidate', {
-                candidate: event.candidate,
-                to: currentCall.contactId
-            });
+            /* socket.emit removed */
         }
     };
 
@@ -1777,11 +1743,7 @@ async function startCall(contactId, type = 'audio') {
         showCallModal(currentCall.contactName, currentCall.contactAvatar, 'Calling...');
 
         // Send call offer via Socket.IO
-        socket.emit('call_offer', {
-            offer,
-            to: contactId,
-            type
-        });
+        /* socket.emit removed */
 
         console.log('[Call] Call initiated to:', contact.name);
 
@@ -1842,10 +1804,7 @@ async function answerCall(callData) {
         showCallModal(currentCall.contactName, currentCall.contactAvatar, 'Connecting...');
 
         // Send answer
-        socket.emit('call_answer', {
-            answer,
-            to: from
-        });
+        /* socket.emit removed */
 
         console.log('[Call] Call answered from:', contact.name);
 
@@ -1914,7 +1873,7 @@ async function endCall() {
 
     // Notify other party
     if (currentCall && isInCall) {
-        socket.emit('call_end', { to: currentCall.contactId });
+        /* socket.emit removed */
     }
 
     // Reset state
@@ -1968,11 +1927,7 @@ function toggleSpeaker() {
 }
 
 // Socket.IO call event handlers
-socket.on('call_offer', (data) => {
-    console.log('[Socket] Incoming call offer:', data);
-    // For now, auto-answer calls. In production, show accept/reject dialog
-    answerCall(data);
-});
+/* socket event removed */
 
 socket.on('call_answer', async (data) => {
     console.log('[Socket] Call answered:', data);
@@ -1982,17 +1937,9 @@ socket.on('call_answer', async (data) => {
     }
 });
 
-socket.on('call_ice_candidate', (data) => {
-    console.log('[Socket] Received ICE candidate');
-    if (peerConnection) {
-        peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-    }
-});
+/* socket event removed */
 
-socket.on('call_end', () => {
-    console.log('[Socket] Call ended by other party');
-    endCall();
-});
+/* socket event removed */
 
 // Event listeners
 videoCallBtn.onclick = () => startCall(activeChatId, 'video');
@@ -2039,3 +1986,54 @@ closeChatFlowModal.onclick = closeChatFlowModalFn;
 btnChatFlowCancel.onclick = closeChatFlowModalFn;
 btnChatFlowSend.onclick = sendChatFlow;
 chatFlowModal.onclick = (e) => { if (e.target === chatFlowModal) closeChatFlowModalFn(); };
+
+// ─── Serverless Polling Engine ───────────────────────────────────────────────
+let lastSyncTime = Date.now();
+
+async function pollUpdates() {
+    try {
+        // Poll for contacts update
+        const updatedContacts = await apiCall('/api/contacts');
+        
+        // Simple UI refresh (in production, diffing would be better)
+        if (JSON.stringify(updatedContacts.map(c => c.id)) !== JSON.stringify(contacts.map(c => c.id))) {
+            contacts = updatedContacts;
+            sortAndRenderChatList();
+        } else {
+            // Update last messages and UI without full re-render
+            updatedContacts.forEach(uc => {
+                const existing = contacts.find(c => c.id === uc.id);
+                if (existing) {
+                    if (existing.lastMessage !== uc.lastMessage || existing.time !== uc.time) {
+                        existing.lastMessage = uc.lastMessage;
+                        existing.time = uc.time;
+                        existing.unread = uc.unread;
+                        unreadCounts[uc.id] = uc.unread || 0;
+                        sortAndRenderChatList();
+                    }
+                }
+            });
+        }
+        
+        // Poll for active chat messages
+        if (activeChatId) {
+            const msgs = await apiCall(`/api/contacts/${activeChatId}/messages`);
+            
+            // Only append new messages
+            const existingIds = Array.from(chatMessages.querySelectorAll('.message')).map(m => m.dataset.msgId);
+            let hasNew = false;
+            msgs.forEach(msg => {
+                if (!existingIds.includes(String(msg.id))) {
+                    appendMessage(msg, false); // false = append to bottom
+                    hasNew = true;
+                }
+            });
+            if (hasNew) scrollToBottom();
+        }
+    } catch (e) {
+        console.error('[Polling] Error:', e);
+    }
+}
+
+// Poll every 3 seconds to keep real-time feel
+setInterval(pollUpdates, 3000);

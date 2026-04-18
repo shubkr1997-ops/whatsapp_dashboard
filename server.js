@@ -2,22 +2,19 @@
 require('dotenv').config();
 
 const express    = require('express');
-const http       = require('http');
 const cors       = require('cors');
 const path       = require('path');
 const fs         = require('fs');
-const { Server } = require('socket.io');
 const axios      = require('axios');
 const multer     = require('multer');
 const db         = require('./data/db');
 const { processIncomingMessage, AGENT_PROMPTS } = require('./ai/engine');
 
 const app    = express();
-const server = http.createServer(app);
-const io     = new Server(server, {
-    cors: { origin: '*' },
-    pingTimeout: 60000,
-});
+const admin      = require('firebase-admin');
+if (!admin.apps.length) admin.initializeApp();
+const bucket = admin.storage().bucket();
+
 
 const PORT = process.env.PORT || 8000;
 
@@ -26,14 +23,7 @@ const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Multer config for image/video uploads
-const storage = multer.diskStorage({
-    destination: UPLOADS_DIR,
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname) || '.jpg';
-        const name = `media_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
-        cb(null, name);
-    },
-});
+const storage = multer.memoryStorage();
 const upload = multer({
     storage,
     limits: { fileSize: 16 * 1024 * 1024 }, // 16MB max
@@ -50,14 +40,7 @@ const upload = multer({
 const TRAINING_DIR = path.join(__dirname, 'training_files');
 fs.mkdirSync(TRAINING_DIR, { recursive: true });
 
-const trainingStorage = multer.diskStorage({
-    destination: TRAINING_DIR,
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname) || '.pdf';
-        const name = `training_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
-        cb(null, name);
-    },
-});
+const trainingStorage = multer.memoryStorage();
 const uploadTraining = multer({
     storage: trainingStorage,
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max for training files
@@ -74,65 +57,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Socket.io ───────────────────────────────────────────────────────────────
-
-io.on('connection', (socket) => {
-    console.log(`[Socket] Client connected: ${socket.id}`);
-
-    // Client joins a room for a specific contact chat
-    socket.on('join_chat', (contactId) => {
-        socket.join(`chat_${contactId}`);
-    });
-
-    socket.on('leave_chat', (contactId) => {
-        socket.leave(`chat_${contactId}`);
-    });
-
-    // ─── WebRTC Call Signaling ──────────────────────────────────────────────────
-
-    // Handle call offer
-    socket.on('call_offer', (data) => {
-        const { offer, to, type } = data;
-        console.log(`[Call] Call offer from ${socket.id} to contact ${to} (${type})`);
-
-        // Forward offer to recipient
-        socket.to(`chat_${to}`).emit('call_offer', {
-            offer,
-            from: to, // Note: this should be the sender's contact ID
-            type
-        });
-    });
-
-    // Handle call answer
-    socket.on('call_answer', (data) => {
-        const { answer, to } = data;
-        console.log(`[Call] Call answer from ${socket.id} to contact ${to}`);
-
-        // Forward answer to caller
-        socket.to(`chat_${to}`).emit('call_answer', { answer });
-    });
-
-    // Handle ICE candidates
-    socket.on('call_ice_candidate', (data) => {
-        const { candidate, to } = data;
-        console.log(`[Call] ICE candidate from ${socket.id} to contact ${to}`);
-
-        // Forward ICE candidate
-        socket.to(`chat_${to}`).emit('call_ice_candidate', { candidate });
-    });
-
-    // Handle call end
-    socket.on('call_end', (data) => {
-        const { to } = data;
-        console.log(`[Call] Call end from ${socket.id} to contact ${to}`);
-
-        // Forward call end
-        socket.to(`chat_${to}`).emit('call_end');
-    });
-
-    socket.on('disconnect', () => {
-        console.log(`[Socket] Client disconnected: ${socket.id}`);
-    });
-});
 
 // ─── Helper: Format timestamp for display ────────────────────────────────────
 
@@ -183,7 +107,7 @@ async function sendViaWhatsApp(toPhone, text) {
 // ─── Helper: Download media from WhatsApp Cloud API ────────────────────────────
 
 async function downloadWhatsAppMedia(mediaId) {
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATSAPP_API_TOKEN;
     if (!accessToken) return null;
 
     // Step 1: Get the media URL from Meta
@@ -200,13 +124,20 @@ async function downloadWhatsAppMedia(mediaId) {
         responseType: 'arraybuffer',
     });
 
-    // Step 3: Save to uploads directory
+    // Step 3: Save to Firebase Storage
     const ext = mimeType.split('/')[1] || 'jpg';
     const filename = `wa_${mediaId}_${Date.now()}.${ext}`;
-    const filePath = path.join(UPLOADS_DIR, filename);
-    fs.writeFileSync(filePath, Buffer.from(fileRes.data));
+    
+    const file = bucket.file(`uploads/${filename}`);
+    await file.save(Buffer.from(fileRes.data), {
+        metadata: { contentType: mimeType }
+    });
+    // Make public so WhatsApp can potentially access it, although incoming might not need it public
+    await file.makePublic();
 
-    return { localUrl: `/uploads/${filename}`, mimeType };
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/uploads/${filename}`;
+
+    return { localUrl: publicUrl, mimeType };
 }
 
 // ─── Helper: Send Image via WhatsApp Cloud API (Meta) ──────────────────────────
@@ -325,7 +256,7 @@ async function uploadMediaToMeta(filePath, mimeType) {
 
 // GET /api/contacts — list all (lightweight, no messages)
 app.get('/api/contacts', (req, res) => {
-    const raw = db.getAllContacts();
+    const raw = await db.getAllContacts();
     const contacts = raw.map(c => ({
         id:          c.id,
         name:        c.name,
@@ -345,13 +276,13 @@ app.get('/api/contacts', (req, res) => {
 // GET /api/contacts/:id — full contact + messages
 app.get('/api/contacts/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const contact = db.getContactById(id);
+    const contact = await db.getContactById(id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
     // Mark all incoming messages as read
-    db.markMessagesRead(id);
+    await db.markMessagesRead(id);
 
-    const rawMsgs = db.getMessages(id);
+    const rawMsgs = await db.getMessages(id);
     const messages = rawMsgs.map(m => ({
         id:        m.id,
         type:      m.type,
@@ -364,7 +295,7 @@ app.get('/api/contacts/:id', (req, res) => {
     }));
 
     // Broadcast updated unread count (now 0) to all clients
-    io.emit('contact_updated', { id, unread: 0 });
+    /* io.emit removed */
 
     res.json({ ...contact, messages });
 });
@@ -376,11 +307,11 @@ app.post('/api/contacts', (req, res) => {
 
     // Prevent duplicate phone numbers
     if (phone) {
-        const existing = db.getContactByPhone(phone);
+        const existing = await db.getContactByPhone(phone);
         if (existing) return res.status(409).json({ error: 'Contact with this phone already exists', contact: existing });
     }
 
-    const contact = db.createContact({ name, phone, avatar, status, about, is_group });
+    const contact = await db.createContact({ name, phone, avatar, status, about, is_group });
     res.status(201).json(contact);
 });
 
@@ -389,13 +320,13 @@ app.put('/api/contacts/:id/favorite', (req, res) => {
     const id = parseInt(req.params.id);
     const { is_favorite } = req.body;
     
-    const contact = db.getContactById(id);
+    const contact = await db.getContactById(id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-    db.updateFavorite(id, is_favorite);
+    await db.updateFavorite(id, is_favorite);
     
     // Broadcast update to all clients
-    io.emit('contact_updated', { id, is_favorite: is_favorite ? 1 : 0 });
+    /* io.emit removed */
     
     res.json({ success: true, is_favorite: is_favorite ? 1 : 0 });
 });
@@ -411,11 +342,11 @@ app.post('/api/contacts/:id/messages', async (req, res) => {
         if (!media_url) return res.status(400).json({ error: 'text or media_url is required' });
     }
 
-    const contact = db.getContactById(id);
+    const contact = await db.getContactById(id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
     // 1. Optimistically save to DB as 'sent'
-    const savedMsg = db.addMessage({
+    const savedMsg = await db.addMessage({
         contact_id: id,
         type: 'outgoing',
         text: (text || caption || '').trim(),
@@ -437,12 +368,10 @@ app.post('/api/contacts/:id/messages', async (req, res) => {
     };
 
     // 2. Broadcast instantly to all clients watching this chat
-    io.to(`chat_${id}`).emit('new_message', { contactId: id, message: formatted });
+    /* io.to.emit removed */
 
     // 3. Also update sidebar for all clients
-    io.emit('contact_updated', {
-        id,
-        lastMessage: savedMsg.text || (media_type === 'image' ? 'Photo' : 'Media'),
+    /* io.emit removed */,
         time: formatTime(savedMsg.timestamp),
     });
 
@@ -454,8 +383,8 @@ app.post('/api/contacts/:id/messages', async (req, res) => {
                 .then((apiRes) => {
                     const waId = apiRes?.messages?.[0]?.id;
                     if (waId && !apiRes.simulated) {
-                        db.markMessageDelivered(savedMsg.id);
-                        io.to(`chat_${id}`).emit('message_status', { msgId: savedMsg.id, status: 'delivered' });
+                        await db.markMessageDelivered(savedMsg.id);
+                        /* io.to.emit removed */
                     }
                 })
                 .catch((err) => {
@@ -467,8 +396,8 @@ app.post('/api/contacts/:id/messages', async (req, res) => {
                 .then((apiRes) => {
                     const waId = apiRes?.messages?.[0]?.id;
                     if (waId && !apiRes.simulated) {
-                        db.markMessageDelivered(savedMsg.id);
-                        io.to(`chat_${id}`).emit('message_status', { msgId: savedMsg.id, status: 'delivered' });
+                        await db.markMessageDelivered(savedMsg.id);
+                        /* io.to.emit removed */
                     }
                 })
                 .catch((err) => {
@@ -487,14 +416,25 @@ app.post('/api/contacts/:id/messages', async (req, res) => {
 
 // POST /api/contacts/:id/upload — upload an image or video file and send it
 app.post('/api/contacts/:id/upload', upload.single('file'), async (req, res) => {
-    const id = parseInt(req.params.id);
-    if (!req.file) return res.status(400).json({ error: 'No file provided' });
-
-    const contact = db.getContactById(id);
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const id = req.params.id;
+    const caption = req.body.caption || '';
+    const contact = await db.getContactById(id);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-    const caption = req.body.caption || '';
-    const localUrl = `/uploads/${req.file.filename}`;
+    // Upload to Firebase Storage
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    const filename = `media_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+    const file = bucket.file(`uploads/${filename}`);
+    
+    await file.save(req.file.buffer, {
+        metadata: { contentType: req.file.mimetype }
+    });
+    await file.makePublic();
+    
+    const localUrl = `https://storage.googleapis.com/${bucket.name}/uploads/${filename}`;
 
     // Determine media type from mimetype
     let mediaType = 'image';
@@ -503,11 +443,10 @@ app.post('/api/contacts/:id/upload', upload.single('file'), async (req, res) => 
     }
 
     // Build public URL for WhatsApp API
-    const publicBase = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
-    const publicUrl = publicBase + localUrl;
+    const publicUrl = localUrl;
 
     // Save to DB
-    const savedMsg = db.addMessage({
+    const savedMsg = await db.addMessage({
         contact_id: id,
         type: 'outgoing',
         text: caption || `[${mediaType === 'video' ? 'Video' : 'Image'}]`,
@@ -530,10 +469,8 @@ app.post('/api/contacts/:id/upload', upload.single('file'), async (req, res) => 
     };
 
     // Broadcast
-    io.to(`chat_${id}`).emit('new_message', { contactId: id, message: formatted });
-    io.emit('contact_updated', {
-        id,
-        lastMessage: caption || (mediaType === 'video' ? 'Video' : 'Photo'),
+    /* io.to.emit removed */
+    /* io.emit removed */,
         time: formatTime(savedMsg.timestamp),
     });
 
@@ -544,8 +481,8 @@ app.post('/api/contacts/:id/upload', upload.single('file'), async (req, res) => 
             .then((apiRes) => {
                 const waId = apiRes?.messages?.[0]?.id;
                 if (waId && !apiRes.simulated) {
-                    db.markMessageDelivered(savedMsg.id);
-                    io.to(`chat_${id}`).emit('message_status', { msgId: savedMsg.id, status: 'delivered' });
+                    await db.markMessageDelivered(savedMsg.id);
+                    /* io.to.emit removed */
                 }
             })
             .catch((err) => {
@@ -672,12 +609,12 @@ app.post('/api/webhook', async (req, res) => {
             // Normalise phone for lookup
             const normPhone = `+${fromPhone}`;
 
-            let contact = db.getContactByPhone(normPhone);
+            let contact = await db.getContactByPhone(normPhone);
 
             // Auto-create contact if not found
             if (!contact) {
                 console.log(`[Webhook] New number: ${normPhone} — auto-creating contact.`);
-                contact = db.createContact({
+                contact = await db.createContact({
                     name:   normPhone,
                     phone:  normPhone,
                     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${fromPhone}`,
@@ -695,7 +632,7 @@ app.post('/api/webhook', async (req, res) => {
                     unread:      1,
                 };
                 console.log('[Socket] Emitting new_contact:', newContactData);
-                io.emit('new_contact', newContactData);
+                /* io.emit removed */
             }
 
             // Save flow response if this is a flow reply
@@ -707,7 +644,7 @@ app.post('/api/webhook', async (req, res) => {
                     const flowId = parsedResp.flow_id || parsedResp.flowId;
 
                     if (flowId) {
-                        db.saveFlowResponse({
+                        await db.saveFlowResponse({
                             flow_id: flowId,
                             contact_id: contact.id,
                             screen_id: parsedResp.screen || null,
@@ -715,11 +652,7 @@ app.post('/api/webhook', async (req, res) => {
                         });
                         console.log(`[Webhook] Flow response saved for flow ${flowId}`);
 
-                        io.emit('flow_response', {
-                            flow_id: flowId,
-                            contact_id: contact.id,
-                            response: parsedResp,
-                        });
+                        /* io.emit removed */
                     }
                 } catch (flowErr) {
                     console.error('[Webhook] Flow response save error:', flowErr.message);
@@ -727,7 +660,7 @@ app.post('/api/webhook', async (req, res) => {
             }
 
             // Persist message
-            const savedMsg = db.addMessage({
+            const savedMsg = await db.addMessage({
                 contact_id:  contact.id,
                 type:        'incoming',
                 text,
@@ -754,16 +687,10 @@ app.post('/api/webhook', async (req, res) => {
 
             // Push to the chat room in real-time
             console.log('[Socket] Emitting new_message to room:', `chat_${contact.id}`, formatted);
-            io.to(`chat_${contact.id}`).emit('new_message', {
-                contactId: contact.id,
-                message:   formatted,
-            });
+            /* io.to.emit removed */
 
             // Update sidebar for all clients
-            io.emit('contact_updated', {
-                id:          contact.id,
-                lastMessage: text,
-                time:        formatTime(savedMsg.timestamp),
+            /* io.emit removed */,
                 unread:      '+1',
             });
 
@@ -781,16 +708,10 @@ app.post('/api/webhook', async (req, res) => {
                     };
 
                     // Broadcast AI reply to chat room
-                    io.to(`chat_${contact.id}`).emit('new_message', {
-                        contactId: contact.id,
-                        message:   aiFormatted,
-                    });
+                    /* io.to.emit removed */
 
                     // Update sidebar
-                    io.emit('contact_updated', {
-                        id:          contact.id,
-                        lastMessage: aiMsg.text,
-                        time:        formatTime(aiMsg.timestamp),
+                    /* io.emit removed */,
                     });
 
                     // Send AI reply via WhatsApp API
@@ -799,8 +720,8 @@ app.post('/api/webhook', async (req, res) => {
                             .then((apiRes) => {
                                 const waId = apiRes?.messages?.[0]?.id;
                                 if (waId && !apiRes.simulated) {
-                                    db.markMessageDelivered(aiMsg.id);
-                                    io.to(`chat_${contact.id}`).emit('message_status', { msgId: aiMsg.id, status: 'delivered' });
+                                    await db.markMessageDelivered(aiMsg.id);
+                                    /* io.to.emit removed */
                                 }
                             })
                             .catch((err) => {
@@ -826,10 +747,10 @@ app.post('/api/simulate/receive', (req, res) => {
     const { contactId, text = 'Hey! Simulated message 👋' } = req.body;
     if (!contactId) return res.status(400).json({ error: 'contactId required' });
 
-    const contact = db.getContactById(parseInt(contactId));
+    const contact = await db.getContactById(parseInt(contactId));
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-    const savedMsg = db.addMessage({ contact_id: contact.id, type: 'incoming', text, status: 'delivered' });
+    const savedMsg = await db.addMessage({ contact_id: contact.id, type: 'incoming', text, status: 'delivered' });
     const formatted = {
         id:     savedMsg.id,
         type:   'incoming',
@@ -838,11 +759,8 @@ app.post('/api/simulate/receive', (req, res) => {
         time:   formatTime(savedMsg.timestamp),
     };
 
-    io.to(`chat_${contact.id}`).emit('new_message', { contactId: contact.id, message: formatted });
-    io.emit('contact_updated', {
-        id:          contact.id,
-        lastMessage: text,
-        time:        formatTime(savedMsg.timestamp),
+    /* io.to.emit removed */
+    /* io.emit removed */,
         unread:      '+1',
     });
 
@@ -854,10 +772,8 @@ app.post('/api/simulate/receive', (req, res) => {
                 id: aiMsg.id, type: 'outgoing', text: aiMsg.text,
                 status: aiMsg.status, time: formatTime(aiMsg.timestamp),
             };
-            io.to(`chat_${contact.id}`).emit('new_message', { contactId: contact.id, message: aiFormatted });
-            io.emit('contact_updated', {
-                id: contact.id, lastMessage: aiMsg.text,
-                time: formatTime(aiMsg.timestamp),
+            /* io.to.emit removed */
+            /* io.emit removed */,
             });
         })
         .catch((err) => console.error('[AI Engine] Simulate processing error:', err.message));
@@ -869,7 +785,7 @@ app.post('/api/simulate/receive', (req, res) => {
 
 // GET /api/agents — list all agent configs
 app.get('/api/agents', (req, res) => {
-    res.json(db.getAllAgentConfigs());
+    res.json(await db.getAllAgentConfigs());
 });
 
 // GET /api/agents/types — available agent types and their default prompts
@@ -921,7 +837,7 @@ app.get('/api/providers/:provider/models', async (req, res) => {
 
 // GET /api/agents/:id — get single agent config
 app.get('/api/agents/:id', (req, res) => {
-    const agent = db.getAgentConfigById(parseInt(req.params.id));
+    const agent = await db.getAgentConfigById(parseInt(req.params.id));
     if (!agent) return res.status(404).json({ error: 'Agent config not found' });
     res.json(agent);
 });
@@ -933,7 +849,7 @@ app.post('/api/agents', (req, res) => {
         return res.status(400).json({ error: 'name, agent_type, and provider are required' });
     }
     const prompt = system_prompt || AGENT_PROMPTS[agent_type] || AGENT_PROMPTS.custom;
-    const agent = db.createAgentConfig({
+    const agent = await db.createAgentConfig({
         name, agent_type, provider,
         model: model || undefined,
         system_prompt: prompt,
@@ -948,11 +864,11 @@ app.post('/api/agents', (req, res) => {
 // PUT /api/agents/:id — update agent config
 app.put('/api/agents/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const existing = db.getAgentConfigById(id);
+    const existing = await db.getAgentConfigById(id);
     if (!existing) return res.status(404).json({ error: 'Agent config not found' });
 
     const { name, agent_type, provider, model, system_prompt, temperature, max_tokens, base_url, is_default } = req.body;
-    const agent = db.updateAgentConfig(id, {
+    const agent = await db.updateAgentConfig(id, {
         name:            name ?? existing.name,
         agent_type:      agent_type ?? existing.agent_type,
         provider:        provider ?? existing.provider,
@@ -969,9 +885,9 @@ app.put('/api/agents/:id', (req, res) => {
 // DELETE /api/agents/:id — delete agent config
 app.delete('/api/agents/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const existing = db.getAgentConfigById(id);
+    const existing = await db.getAgentConfigById(id);
     if (!existing) return res.status(404).json({ error: 'Agent config not found' });
-    db.deleteAgentConfig(id);
+    await db.deleteAgentConfig(id);
     res.json({ success: true });
 });
 
@@ -982,7 +898,7 @@ const { parseCSV } = require('csv-parse');
 
 app.get('/api/agents/:id/knowledge', (req, res) => {
     const agentId = parseInt(req.params.id);
-    const knowledge = db.getKnowledgeByAgent(agentId);
+    const knowledge = await db.getKnowledgeByAgent(agentId);
     res.json(knowledge);
 });
 
@@ -993,24 +909,33 @@ app.post('/api/agents/:id/knowledge/upload', uploadTraining.single('file'), asyn
             return res.status(400).json({ error: 'No file uploaded' });
         }
 
-        const agent = db.getAgentConfigById(agentId);
+        const agent = await db.getAgentConfigById(agentId);
         if (!agent) {
             return res.status(404).json({ error: 'Agent not found' });
         }
 
-        const filePath = req.file.path;
         const fileType = req.file.mimetype === 'application/pdf' ? 'pdf' : 'csv';
         const fileName = req.file.originalname;
+        const ext = path.extname(fileName) || (fileType === 'pdf' ? '.pdf' : '.csv');
+        const storageFilename = `training_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+        
+        // Upload to Firebase Storage
+        const fileObj = bucket.file(`training/${storageFilename}`);
+        await fileObj.save(req.file.buffer, {
+            metadata: { contentType: req.file.mimetype }
+        });
+        
+        const filePath = `gs://${bucket.name}/training/${storageFilename}`;
+
         let content = '';
         let recordCount = 0;
 
         if (fileType === 'pdf') {
-            const dataBuffer = fs.readFileSync(filePath);
-            const pdfData = await parsePDF(dataBuffer);
+            const pdfData = await parsePDF(req.file.buffer);
             content = pdfData.text.substring(0, 100000);
             recordCount = pdfData.numpages || 1;
         } else {
-            const csvContent = fs.readFileSync(filePath, 'utf-8');
+            const csvContent = req.file.buffer.toString('utf-8');
             const records = await new Promise((resolve, reject) => {
                 parseCSV(csvContent, { columns: true }, (err, records) => {
                     if (err) reject(err);
@@ -1021,7 +946,7 @@ app.post('/api/agents/:id/knowledge/upload', uploadTraining.single('file'), asyn
             recordCount = records.length || 0;
         }
 
-        const knowledge = db.addKnowledge({
+        const knowledge = await db.addKnowledge({
             agent_id: agentId,
             type: fileType,
             name: fileName,
@@ -1046,14 +971,14 @@ app.post('/api/agents/:id/knowledge/google-sheet', (req, res) => {
             return res.status(400).json({ error: 'sheet_url and credentials are required' });
         }
 
-        const agent = db.getAgentConfigById(agentId);
+        const agent = await db.getAgentConfigById(agentId);
         if (!agent) {
             return res.status(404).json({ error: 'Agent not found' });
         }
 
         const sheetId = sheet_url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1] || sheet_url;
 
-        const knowledge = db.addKnowledge({
+        const knowledge = await db.addKnowledge({
             agent_id: agentId,
             type: 'google_sheet',
             name: sheet_name || `Google Sheet (${sheetId})`,
@@ -1073,7 +998,7 @@ app.post('/api/agents/:id/knowledge/google-sheet', (req, res) => {
 app.get('/api/knowledge/:kid/sync', async (req, res) => {
     try {
         const kid = parseInt(req.params.kid);
-        const knowledge = db.getKnowledgeById(kid);
+        const knowledge = await db.getKnowledgeById(kid);
 
         if (!knowledge) {
             return res.status(404).json({ error: 'Knowledge entry not found' });
@@ -1090,7 +1015,7 @@ app.get('/api/knowledge/:kid/sync', async (req, res) => {
                 const rows = response.data.values || [];
                 const content = rows.map(r => r.join(', ')).join('\n');
 
-                db.updateKnowledge(kid, {
+                await db.updateKnowledge(kid, {
                     content: content.substring(0, 100000),
                     last_synced: new Date().toISOString(),
                     record_count: rows.length,
@@ -1112,7 +1037,7 @@ app.post('/api/knowledge/:kid/write-sheet', async (req, res) => {
     try {
         const kid = parseInt(req.params.kid);
         const { range, values } = req.body;
-        const knowledge = db.getKnowledgeById(kid);
+        const knowledge = await db.getKnowledgeById(kid);
 
         if (!knowledge || knowledge.type !== 'google_sheet') {
             return res.status(404).json({ error: 'Google Sheet knowledge entry not found' });
@@ -1137,7 +1062,7 @@ app.post('/api/knowledge/:kid/write-sheet', async (req, res) => {
 
 app.delete('/api/knowledge/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const knowledge = db.getKnowledgeById(id);
+    const knowledge = await db.getKnowledgeById(id);
     if (!knowledge) {
         return res.status(404).json({ error: 'Knowledge entry not found' });
     }
@@ -1145,7 +1070,7 @@ app.delete('/api/knowledge/:id', (req, res) => {
     if (knowledge.file_path && fs.existsSync(knowledge.file_path)) {
         fs.unlinkSync(knowledge.file_path);
     }
-    db.deleteKnowledge(id);
+    await db.deleteKnowledge(id);
     res.json({ success: true });
 });
 
@@ -1153,7 +1078,7 @@ app.delete('/api/knowledge/:id', (req, res) => {
 
 app.get('/api/agents/:id/mcp_servers', (req, res) => {
     const agentId = parseInt(req.params.id);
-    const servers = db.getMcpServersByAgent(agentId);
+    const servers = await db.getMcpServersByAgent(agentId);
     res.json(servers);
 });
 
@@ -1166,7 +1091,7 @@ app.post('/api/agents/:id/mcp_servers/google-sheet', (req, res) => {
             return res.status(400).json({ error: 'sheet_url and credentials are required' });
         }
 
-        const agent = db.getAgentConfigById(agentId);
+        const agent = await db.getAgentConfigById(agentId);
         if (!agent) {
             return res.status(404).json({ error: 'Agent not found' });
         }
@@ -1178,7 +1103,7 @@ app.post('/api/agents/:id/mcp_servers/google-sheet', (req, res) => {
             allow_write: !!allow_write
         });
 
-        const server = db.addMcpServer({
+        const server = await db.addMcpServer({
             agent_config_id: agentId,
             type: 'google_sheet',
             name: name || 'Google Sheets',
@@ -1194,11 +1119,11 @@ app.post('/api/agents/:id/mcp_servers/google-sheet', (req, res) => {
 
 app.delete('/api/mcp_servers/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const server = db.getMcpServerById(id);
+    const server = await db.getMcpServerById(id);
     if (!server) {
         return res.status(404).json({ error: 'MCP Server not found' });
     }
-    db.deleteMcpServer(id);
+    await db.deleteMcpServer(id);
     res.json({ success: true });
 });
 
@@ -1206,13 +1131,13 @@ app.delete('/api/mcp_servers/:id', (req, res) => {
 
 // GET /api/calls — get all calls
 app.get('/api/calls', (req, res) => {
-    res.json(db.getAllCalls());
+    res.json(await db.getAllCalls());
 });
 
 // GET /api/calls/:contactId — get calls for a specific contact
 app.get('/api/calls/:contactId', (req, res) => {
     const contactId = parseInt(req.params.contactId);
-    res.json(db.getCallsByContact(contactId));
+    res.json(await db.getCallsByContact(contactId));
 });
 
 // POST /api/calls — create a new call record
@@ -1222,20 +1147,20 @@ app.post('/api/calls', (req, res) => {
         return res.status(400).json({ error: 'contact_id, type, and direction are required' });
     }
 
-    const call = db.createCall({ contact_id, type, direction, status });
+    const call = await db.createCall({ contact_id, type, direction, status });
     res.status(201).json(call);
 });
 
 // PUT /api/calls/:id — update call status
 app.put('/api/calls/:id', (req, res) => {
     const id = parseInt(req.params.id);
-    const existing = db.getCallById(id);
+    const existing = await db.getCallById(id);
     if (!existing) return res.status(404).json({ error: 'Call not found' });
 
     const { status, duration } = req.body;
     const ended_at = status === 'completed' || status === 'failed' ? new Date().toISOString() : null;
 
-    db.updateCallStatus(id, status, duration, ended_at);
+    await db.updateCallStatus(id, status, duration, ended_at);
     res.json({ success: true });
 });
 
@@ -1244,12 +1169,12 @@ app.put('/api/calls/:id', (req, res) => {
 // GET /api/contacts/:id/mode — get conversation mode for a contact
 app.get('/api/contacts/:id/mode', (req, res) => {
     const contactId = parseInt(req.params.id);
-    const contact = db.getContactById(contactId);
+    const contact = await db.getContactById(contactId);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
-    let mode = db.getConversationMode(contactId);
+    let mode = await db.getConversationMode(contactId);
     if (!mode) {
-        mode = db.setConversationMode({ contact_id: contactId, mode: 'human' });
+        mode = await db.setConversationMode({ contact_id: contactId, mode: 'human' });
     }
     res.json(mode);
 });
@@ -1257,7 +1182,7 @@ app.get('/api/contacts/:id/mode', (req, res) => {
 // PUT /api/contacts/:id/mode — set conversation mode (AI or Human)
 app.put('/api/contacts/:id/mode', (req, res) => {
     const contactId = parseInt(req.params.id);
-    const contact = db.getContactById(contactId);
+    const contact = await db.getContactById(contactId);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
     const { mode, agent_config_id, auto_handover } = req.body;
@@ -1265,7 +1190,7 @@ app.put('/api/contacts/:id/mode', (req, res) => {
         return res.status(400).json({ error: 'mode must be "human" or "ai"' });
     }
 
-    const result = db.setConversationMode({
+    const result = await db.setConversationMode({
         contact_id: contactId,
         mode: mode || 'human',
         agent_config_id: agent_config_id || null,
@@ -1273,7 +1198,7 @@ app.put('/api/contacts/:id/mode', (req, res) => {
     });
 
     // Notify all clients about mode change
-    io.emit('mode_changed', { contactId, mode: result.mode, agentName: result.agent_name });
+    /* io.emit removed */
 
     res.json(result);
 });
@@ -1281,18 +1206,18 @@ app.put('/api/contacts/:id/mode', (req, res) => {
 // POST /api/contacts/:id/history/clear — clear conversation history (reset AI memory)
 app.post('/api/contacts/:id/history/clear', (req, res) => {
     const contactId = parseInt(req.params.id);
-    const contact = db.getContactById(contactId);
+    const contact = await db.getContactById(contactId);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
-    db.clearHistory(contactId);
+    await db.clearHistory(contactId);
     res.json({ success: true, message: 'Conversation history cleared' });
 });
 
 // GET /api/contacts/:id/history — get conversation history (AI context)
 app.get('/api/contacts/:id/history', (req, res) => {
     const contactId = parseInt(req.params.id);
-    const contact = db.getContactById(contactId);
+    const contact = await db.getContactById(contactId);
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
-    res.json(db.getConversationHistory(contactId));
+    res.json(await db.getConversationHistory(contactId));
 });
 
 // ─── ROUTES: Catalog Integration ──────────────────────────────────────────────
@@ -1312,7 +1237,7 @@ app.post('/api/catalog/auth', async (req, res) => {
 
     // Store credentials
     try {
-        db.upsertCatalog({
+        await db.upsertCatalog({
             business_id: business_id || null,
             waba_id: waba_id || null,
             catalog_id: 'pending',
@@ -1344,13 +1269,13 @@ app.get('/api/catalog/catalogs', async (req, res) => {
         }));
 
         // Also return locally stored catalogs
-        const localCatalogs = db.getAllCatalogs();
+        const localCatalogs = await db.getAllCatalogs();
 
         res.json({ remote: catalogs, local: localCatalogs });
     } catch (err) {
         console.error('[Catalog List] Error:', err.response?.data || err.message);
         // Fallback to local catalogs
-        res.json({ remote: [], local: db.getAllCatalogs(), error: err.response?.data?.error?.message || err.message });
+        res.json({ remote: [], local: await db.getAllCatalogs(), error: err.response?.data?.error?.message || err.message });
     }
 });
 
@@ -1372,7 +1297,7 @@ app.post('/api/catalog/connect', async (req, res) => {
         }
 
         // Store in local DB
-        const catalog = db.upsertCatalog({
+        const catalog = await db.upsertCatalog({
             business_id: business_id || process.env.META_BUSINESS_ID || null,
             waba_id: waId || null,
             catalog_id,
@@ -1384,7 +1309,7 @@ app.post('/api/catalog/connect', async (req, res) => {
     } catch (err) {
         console.error('[Catalog Connect] Error:', err.response?.data || err.message);
         // Still save locally even if Meta API fails
-        const catalog = db.upsertCatalog({
+        const catalog = await db.upsertCatalog({
             business_id: business_id || process.env.META_BUSINESS_ID || null,
             waba_id: waba_id || process.env.META_WABA_ID || null,
             catalog_id,
@@ -1416,9 +1341,9 @@ app.get('/api/catalog/products/:catalogId', async (req, res) => {
             }
 
             // Store in local DB
-            db.clearProductsForCatalog(catalogId);
+            await db.clearProductsForCatalog(catalogId);
             for (const p of allProducts) {
-                db.upsertProduct({
+                await db.upsertProduct({
                     catalog_id: catalogId,
                     product_id: p.id,
                     name: p.name || '',
@@ -1429,7 +1354,7 @@ app.get('/api/catalog/products/:catalogId', async (req, res) => {
                 });
             }
 
-            const localProducts = db.getProductsByCatalog(catalogId);
+            const localProducts = await db.getProductsByCatalog(catalogId);
             return res.json({ products: localProducts, synced: true, count: localProducts.length });
         } catch (err) {
             console.error('[Catalog Products Sync] Error:', err.response?.data || err.message);
@@ -1438,7 +1363,7 @@ app.get('/api/catalog/products/:catalogId', async (req, res) => {
     }
 
     // Return local products
-    const products = db.getProductsByCatalog(catalogId);
+    const products = await db.getProductsByCatalog(catalogId);
     res.json({ products, synced: false, count: products.length });
 });
 
@@ -1452,7 +1377,7 @@ app.post('/api/catalog/send-product', async (req, res) => {
         return res.status(400).json({ error: 'contact_id, catalog_id, and product_retailer_id are required' });
     }
 
-    const contact = db.getContactById(parseInt(contact_id));
+    const contact = await db.getContactById(parseInt(contact_id));
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
     // Get product info for display
@@ -1460,7 +1385,7 @@ app.post('/api/catalog/send-product', async (req, res) => {
     const displayText = body_text || `Shared a product`;
 
     // Save outgoing message to DB
-    const savedMsg = db.addMessage({
+    const savedMsg = await db.addMessage({
         contact_id: contact.id,
         type: 'outgoing',
         text: displayText,
@@ -1478,8 +1403,8 @@ app.post('/api/catalog/send-product', async (req, res) => {
     };
 
     // Broadcast to chat
-    io.to(`chat_${contact.id}`).emit('new_message', { contactId: contact.id, message: formatted });
-    io.emit('contact_updated', { id: contact.id, lastMessage: displayText, time: formatTime(savedMsg.timestamp) });
+    /* io.to.emit removed */
+    /* io.emit removed */ });
 
     // Send via WhatsApp Cloud API
     if (accessToken && phoneNumberId && contact.phone && !contact.is_group) {
@@ -1505,8 +1430,8 @@ app.post('/api/catalog/send-product', async (req, res) => {
 
             const waId = apiRes.data?.messages?.[0]?.id;
             if (waId) {
-                db.markMessageDelivered(savedMsg.id);
-                io.to(`chat_${contact.id}`).emit('message_status', { msgId: savedMsg.id, status: 'delivered' });
+                await db.markMessageDelivered(savedMsg.id);
+                /* io.to.emit removed */
             }
         } catch (err) {
             console.error('[Send Product Error]', err.response?.data || err.message);
@@ -1526,13 +1451,13 @@ app.post('/api/catalog/send-catalog', async (req, res) => {
         return res.status(400).json({ error: 'contact_id and catalog_id are required' });
     }
 
-    const contact = db.getContactById(parseInt(contact_id));
+    const contact = await db.getContactById(parseInt(contact_id));
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
     const displayText = body_text || 'Shared product catalog';
 
     // Save outgoing message
-    const savedMsg = db.addMessage({
+    const savedMsg = await db.addMessage({
         contact_id: contact.id,
         type: 'outgoing',
         text: displayText,
@@ -1549,13 +1474,13 @@ app.post('/api/catalog/send-catalog', async (req, res) => {
         time: formatTime(savedMsg.timestamp),
     };
 
-    io.to(`chat_${contact.id}`).emit('new_message', { contactId: contact.id, message: formatted });
-    io.emit('contact_updated', { id: contact.id, lastMessage: displayText, time: formatTime(savedMsg.timestamp) });
+    /* io.to.emit removed */
+    /* io.emit removed */ });
 
     // Build sections from request or use all products
     let productSections = sections;
     if (!productSections || productSections.length === 0) {
-        const products = db.getProductsByCatalog(catalog_id);
+        const products = await db.getProductsByCatalog(catalog_id);
         productSections = [{
             title: 'All Items',
             product_items: products.slice(0, 10).map(p => ({ product_retailer_id: p.retailer_id || p.product_id })),
@@ -1587,8 +1512,8 @@ app.post('/api/catalog/send-catalog', async (req, res) => {
 
             const waId = apiRes.data?.messages?.[0]?.id;
             if (waId) {
-                db.markMessageDelivered(savedMsg.id);
-                io.to(`chat_${contact.id}`).emit('message_status', { msgId: savedMsg.id, status: 'delivered' });
+                await db.markMessageDelivered(savedMsg.id);
+                /* io.to.emit removed */
             }
         } catch (err) {
             console.error('[Send Catalog Error]', err.response?.data || err.message);
@@ -1601,13 +1526,13 @@ app.post('/api/catalog/send-catalog', async (req, res) => {
 // DELETE /api/catalog/disconnect/:catalogId — Disconnect a catalog
 app.delete('/api/catalog/disconnect/:catalogId', (req, res) => {
     const { catalogId } = req.params;
-    db.deleteCatalog(catalogId);
+    await db.deleteCatalog(catalogId);
     res.json({ success: true });
 });
 
 // GET /api/catalog/list — List locally stored catalogs
 app.get('/api/catalog/list', (req, res) => {
-    const catalogs = db.getAllCatalogs();
+    const catalogs = await db.getAllCatalogs();
     res.json(catalogs);
 });
 
@@ -1615,12 +1540,12 @@ app.get('/api/catalog/list', (req, res) => {
 
 // GET /api/flows — List all flows
 app.get('/api/flows', (req, res) => {
-    res.json(db.getAllFlows());
+    res.json(await db.getAllFlows());
 });
 
 // GET /api/flows/:flowId — Get single flow
 app.get('/api/flows/:flowId', (req, res) => {
-    const flow = db.getFlowByFlowId(req.params.flowId);
+    const flow = await db.getFlowByFlowId(req.params.flowId);
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
     res.json(flow);
 });
@@ -1631,7 +1556,7 @@ app.post('/api/flows', (req, res) => {
     if (!name) return res.status(400).json({ error: 'name is required' });
 
     const flowId = 'flow_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    const flow = db.createFlow({
+    const flow = await db.createFlow({
         flow_id: flowId,
         name,
         description: description || '',
@@ -1643,11 +1568,11 @@ app.post('/api/flows', (req, res) => {
 
 // PUT /api/flows/:flowId — Update a flow
 app.put('/api/flows/:flowId', (req, res) => {
-    const existing = db.getFlowByFlowId(req.params.flowId);
+    const existing = await db.getFlowByFlowId(req.params.flowId);
     if (!existing) return res.status(404).json({ error: 'Flow not found' });
 
     const { name, description, category, status, flow_json } = req.body;
-    const flow = db.updateFlow(req.params.flowId, {
+    const flow = await db.updateFlow(req.params.flowId, {
         name: name ?? existing.name,
         description: description ?? existing.description,
         category: category ?? existing.category,
@@ -1662,15 +1587,15 @@ app.put('/api/flows/:flowId', (req, res) => {
 
 // DELETE /api/flows/:flowId — Delete a flow
 app.delete('/api/flows/:flowId', (req, res) => {
-    const existing = db.getFlowByFlowId(req.params.flowId);
+    const existing = await db.getFlowByFlowId(req.params.flowId);
     if (!existing) return res.status(404).json({ error: 'Flow not found' });
-    db.deleteFlow(req.params.flowId);
+    await db.deleteFlow(req.params.flowId);
     res.json({ success: true });
 });
 
 // POST /api/flows/:flowId/publish — Publish flow to Meta (create + upload JSON + publish)
 app.post('/api/flows/:flowId/publish', async (req, res) => {
-    const existing = db.getFlowByFlowId(req.params.flowId);
+    const existing = await db.getFlowByFlowId(req.params.flowId);
     if (!existing) return res.status(404).json({ error: 'Flow not found' });
 
     const accessToken = req.headers.authorization?.replace('Bearer ', '') || process.env.WHATSAPP_ACCESS_TOKEN;
@@ -1692,7 +1617,7 @@ app.post('/api/flows/:flowId/publish', async (req, res) => {
                 headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
             });
             metaFlowId = createRes.data.id;
-            db.updateFlowMetaId(req.params.flowId, metaFlowId);
+            await db.updateFlowMetaId(req.params.flowId, metaFlowId);
             console.log(`[Flow Publish] Created Meta flow: ${metaFlowId}`);
         }
 
@@ -1730,14 +1655,14 @@ app.post('/api/flows/:flowId/publish', async (req, res) => {
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         });
 
-        db.updateFlowStatus(req.params.flowId, 'PUBLISHED');
+        await db.updateFlowStatus(req.params.flowId, 'PUBLISHED');
         console.log(`[Flow Publish] Published flow ${metaFlowId}`);
         res.json({ success: true, meta_flow_id: metaFlowId, status: 'PUBLISHED' });
     } catch (err) {
         console.error('[Flow Publish] Error:', err.response?.data || err.message);
         const metaError = err.response?.data?.error;
         // Mark as published locally for offline testing
-        db.updateFlowStatus(req.params.flowId, 'PUBLISHED');
+        await db.updateFlowStatus(req.params.flowId, 'PUBLISHED');
         res.json({
             success: true,
             warning: 'Marked as published locally.',
@@ -1751,10 +1676,10 @@ app.post('/api/flows/:flowId/publish', async (req, res) => {
 // POST /api/flows/:flowId/send — Send flow message to a contact
 app.post('/api/flows/:flowId/send', async (req, res) => {
     const { contact_id, header_text, body_text, footer_text, flow_cta } = req.body;
-    const flow = db.getFlowByFlowId(req.params.flowId);
+    const flow = await db.getFlowByFlowId(req.params.flowId);
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
 
-    const contact = db.getContactById(parseInt(contact_id));
+    const contact = await db.getContactById(parseInt(contact_id));
     if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
     const accessToken = req.headers.authorization?.replace('Bearer ', '') || process.env.WHATSAPP_ACCESS_TOKEN;
@@ -1763,7 +1688,7 @@ app.post('/api/flows/:flowId/send', async (req, res) => {
     const displayText = `[Flow] ${flow.name}`;
 
     // Save outgoing message
-    const savedMsg = db.addMessage({
+    const savedMsg = await db.addMessage({
         contact_id: contact.id,
         type: 'outgoing',
         text: displayText,
@@ -1780,8 +1705,8 @@ app.post('/api/flows/:flowId/send', async (req, res) => {
         time: formatTime(savedMsg.timestamp),
     };
 
-    io.to(`chat_${contact.id}`).emit('new_message', { contactId: contact.id, message: formatted });
-    io.emit('contact_updated', { id: contact.id, lastMessage: displayText, time: formatTime(savedMsg.timestamp) });
+    /* io.to.emit removed */
+    /* io.emit removed */ });
 
     // Send via WhatsApp Cloud API as Flow message
     if (accessToken && phoneNumberId && contact.phone && !contact.is_group) {
@@ -1822,8 +1747,8 @@ app.post('/api/flows/:flowId/send', async (req, res) => {
 
             const waId = apiRes.data?.messages?.[0]?.id;
             if (waId) {
-                db.markMessageDelivered(savedMsg.id);
-                io.to(`chat_${contact.id}`).emit('message_status', { msgId: savedMsg.id, status: 'delivered' });
+                await db.markMessageDelivered(savedMsg.id);
+                /* io.to.emit removed */
             }
         } catch (err) {
             console.error('[Send Flow Error]', err.response?.data || err.message);
@@ -1842,7 +1767,7 @@ app.post('/api/flows/:flowId/webhook', (req, res) => {
         const { contact_id, screen_id, response } = req.body;
 
         if (contact_id) {
-            db.saveFlowResponse({
+            await db.saveFlowResponse({
                 flow_id,
                 contact_id: parseInt(contact_id),
                 screen_id: screen_id || null,
@@ -1852,9 +1777,7 @@ app.post('/api/flows/:flowId/webhook', (req, res) => {
             console.log(`[Flow Webhook] Response received for flow ${flow_id} from contact ${contact_id}`);
 
             // Notify clients via socket
-            io.emit('flow_response', {
-                flow_id,
-                contact_id: parseInt(contact_id),
+            /* io.emit removed */,
                 screen_id,
                 response: response || req.body,
             });
@@ -1866,24 +1789,24 @@ app.post('/api/flows/:flowId/webhook', (req, res) => {
 
 // GET /api/flows/:flowId/responses — Get all responses for a flow
 app.get('/api/flows/:flowId/responses', (req, res) => {
-    const flow = db.getFlowByFlowId(req.params.flowId);
+    const flow = await db.getFlowByFlowId(req.params.flowId);
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
-    res.json(db.getFlowResponses(req.params.flowId));
+    res.json(await db.getFlowResponses(req.params.flowId));
 });
 
 // GET /api/flows/:flowId/responses/:contactId — Get responses for a flow from a specific contact
 app.get('/api/flows/:flowId/responses/:contactId', (req, res) => {
-    const flow = db.getFlowByFlowId(req.params.flowId);
+    const flow = await db.getFlowByFlowId(req.params.flowId);
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
-    res.json(db.getFlowResponsesByContact(req.params.flowId, parseInt(req.params.contactId)));
+    res.json(await db.getFlowResponsesByContact(req.params.flowId, parseInt(req.params.contactId)));
 });
 
 // GET /api/flows/:flowId/stats — Get flow analytics
 app.get('/api/flows/:flowId/stats', (req, res) => {
-    const flow = db.getFlowByFlowId(req.params.flowId);
+    const flow = await db.getFlowByFlowId(req.params.flowId);
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
 
-    const responses = db.getFlowResponses(req.params.flowId);
+    const responses = await db.getFlowResponses(req.params.flowId);
     const uniqueContacts = new Set(responses.map(r => r.contact_id));
 
     res.json({
@@ -2178,7 +2101,7 @@ app.post('/api/flows/templates/:templateId/create', (req, res) => {
     if (!flowJson) return res.status(404).json({ error: 'Template data not found' });
 
     const flowId = 'flow_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    const flow = db.createFlow({
+    const flow = await db.createFlow({
         flow_id: flowId,
         name: req.body.name || template.name,
         description: template.description,
@@ -2200,7 +2123,7 @@ app.post('/api/flows/validate-token', (req, res) => {
 
         if (!data.flow_id) return res.json({ valid: false, error: 'Missing flow_id in token' });
 
-        const flow = db.getFlowByFlowId(data.flow_id);
+        const flow = await db.getFlowByFlowId(data.flow_id);
         if (!flow) return res.json({ valid: false, error: 'Flow not found' });
 
         res.json({
@@ -2239,22 +2162,12 @@ process.on('unhandledRejection', (err) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('[Server] SIGTERM received, shutting down...');
-    server.close(() => process.exit(0));
 });
 
 process.on('SIGINT', () => {
     console.log('[Server] SIGINT received, shutting down...');
-    server.close(() => process.exit(0));
 });
 
-server.listen(PORT, () => {
-    console.log(`\n🚀 WhatsApp Dashboard running → http://localhost:${PORT}`);
-    console.log(`   Socket.io  : enabled`);
-    console.log(`   WhatsApp API: ${process.env.WHATSAPP_ACCESS_TOKEN ? '✅ configured' : '⚠️  not configured (simulation mode)'}`);
-    console.log(`   Webhook token: ${process.env.WEBHOOK_VERIFY_TOKEN || '(not set)'}`);
-    console.log(`   AI Providers :`);
-    console.log(`     OpenAI/ChatGPT: ${process.env.OPENAI_API_KEY ? '✅' : '❌'}`);
-    console.log(`     Gemini        : ${process.env.GEMINI_API_KEY ? '✅' : '❌'}`);
-    console.log(`     Ollama        : ${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}`);
-    console.log('');
-});
+
+const functions = require('firebase-functions/v2');
+exports.api = functions.https.onRequest(app);

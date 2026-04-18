@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /uploads/{allPaths=**} {
+      // Allow public read so WhatsApp Cloud API can fetch images sent by the dashboard
+      allow read: if true;
+      // Restrict writes to authenticated administrative users/server SDK
+      allow write: if request.auth != null;
+    }
+  }
+}
