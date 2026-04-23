@@ -55,7 +55,7 @@ const AGENT_PROMPTS = {
  * @param {string} mediaMime - The MIME type of the media (if any)
  * @returns {Promise<Object|null>} The saved outgoing message or null if human mode
  */
-async async function processIncomingMessage(contactId, incomingText, contact, io, mediaUrl = null, mediaMime = null) {
+async function processIncomingMessage(contactId, incomingText, contact, io, mediaUrl = null, mediaMime = null) {
     // Check conversation mode
     let modeRow = await db.getConversationMode(contactId);
 

@@ -1,0 +1,53 @@
+runConfig:
+  concurrency: 100
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 2
+
+env:
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: WHATSAPP_PHONE_NUMBER_ID
+    value: "1064006373459282"
+    availability:
+      - RUNTIME
+
+  - variable: WEBHOOK_VERIFY_TOKEN
+    value: "my_super_secret_token_123"
+    availability:
+      - RUNTIME
+
+  - variable: META_APP_ID
+    value: "1674886223527683"
+    availability:
+      - RUNTIME
+
+  - variable: META_BUSINESS_ID
+    value: "1189770846614946"
+    availability:
+      - RUNTIME
+
+  - variable: META_WABA_ID
+    value: "1064006373459282"
+    availability:
+      - RUNTIME
+
+  - variable: FIREBASE_PROJECT_ID
+    value: whatsappdashboard-bfa45
+    availability:
+      - RUNTIME
+
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: whatsappdashboard-bfa45.firebasestorage.app
+    availability:
+      - RUNTIME
+
+  - variable: PUBLIC_URL
+    value: https://whatsapp-dashboard--whatsappdashboard-bfa45.asia-southeast1.hosted.app
+    availability:
+      - RUNTIME

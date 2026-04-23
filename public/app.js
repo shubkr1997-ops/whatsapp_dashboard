@@ -6,14 +6,12 @@ const IS_PRODUCTION = window.location.hostname !== 'localhost' && window.locatio
 const FUNCTIONS_REGION = 'us-central1';
 const PROJECT_ID = 'whatsappdashboard-bfa45';
 
-// API base URL
-const API_BASE = IS_PRODUCTION
-    ? `https://${FUNCTIONS_REGION}-${PROJECT_ID}.cloudfunctions.net`
-    : '';
+// API base URL - empty for relative paths via Hosting rewrites
+const API_BASE = '';
 
 // Utility function for API calls
 async function apiCall(endpoint, options = {}) {
-    const url = IS_PRODUCTION ? `${API_BASE}${endpoint}` : endpoint;
+    const url = `${API_BASE}${endpoint}`;
     const config = {
         headers: {
             'Content-Type': 'application/json',
@@ -1110,32 +1108,46 @@ async function simulateInboundMessage() {
 // ─── Event Listeners ─────────────────────────────────────────────────────────
 
 function setupEventListeners() {
-    sendBtn.onclick        = sendMessage;
-    plusBtn.onclick        = toggleAttachmentMenu;
-    micBtn.onclick         = toggleRecording;
+    if (sendBtn) sendBtn.onclick = sendMessage;
+    if (plusBtn) plusBtn.onclick = toggleAttachmentMenu;
+    if (micBtn) micBtn.onclick = toggleRecording;
 
-    messageInput.onkeydown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    };
+    if (messageInput) {
+        messageInput.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        };
 
-    messageInput.addEventListener('input', () => {
-        adjustTextareaHeight();
-        updateInputButtons();
-    });
-    chatSearch.oninput     = sortAndRenderChatList;
+        messageInput.addEventListener('input', () => {
+            adjustTextareaHeight();
+            updateInputButtons();
+        });
+    }
 
-    document.getElementById('openDetails').onclick = () => {
-        document.querySelector('.app-wrapper').classList.add('details-open');
-    };
-    document.getElementById('closeDetails').onclick = () => {
-        document.querySelector('.app-wrapper').classList.remove('details-open');
-    };
-    document.getElementById('backBtn').onclick = () => {
-        document.querySelector('.active-conversation-panel').classList.remove('show-mobile');
-    };
+    if (chatSearch) chatSearch.oninput = sortAndRenderChatList;
+
+    const openDetailsBtn = document.getElementById('openDetails');
+    if (openDetailsBtn) {
+        openDetailsBtn.onclick = () => {
+            document.querySelector('.app-wrapper').classList.add('details-open');
+        };
+    }
+
+    const closeDetailsBtn = document.getElementById('closeDetails');
+    if (closeDetailsBtn) {
+        closeDetailsBtn.onclick = () => {
+            document.querySelector('.app-wrapper').classList.remove('details-open');
+        };
+    }
+
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+        backBtn.onclick = () => {
+            document.querySelector('.active-conversation-panel').classList.remove('show-mobile');
+        };
+    }
 
     // Filter Pills
     document.querySelectorAll('.filter-pill').forEach(pill => {

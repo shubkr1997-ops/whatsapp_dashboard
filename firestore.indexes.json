@@ -46,6 +46,21 @@
   //     ]
   //   },
   // ]
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "contacts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "is_favorite",
+          "mode": "DESCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "mode": "DESCENDING"
+        }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

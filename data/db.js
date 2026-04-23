@@ -3,7 +3,10 @@ const admin = require('firebase-admin');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
-    admin.initializeApp();
+    admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+    });
 }
 
 const db = admin.firestore();
@@ -13,10 +16,16 @@ const db = admin.firestore();
 module.exports = {
     // --- Contacts ---
     async getAllContacts() {
-        const snapshot = await db.collection('contacts').orderBy('is_favorite', 'desc').orderBy('created_at', 'desc').get();
+        const snapshot = await db.collection('contacts').orderBy('created_at', 'desc').get();
         // Note: Joining with last message in Firestore usually involves denormalization.
-        // For now, we perform a flat fetch.
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // For now, we perform a flat fetch and sort favorites in memory.
+        const contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Sort favorites first, then by creation date
+        return contacts.sort((a, b) => {
+            if (a.is_favorite && !b.is_favorite) return -1;
+            if (!a.is_favorite && b.is_favorite) return 1;
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        });
     },
 
     async getContactById(id) {
@@ -226,5 +235,64 @@ module.exports = {
 
     async deleteMcpServer(id) {
         await db.collection('mcp_servers').doc(String(id)).delete();
+    },
+
+    // --- Catalogs ---
+    async upsertCatalog({ business_id, waba_id, catalog_id, access_token, name }) {
+        const data = {
+            business_id: business_id || null,
+            waba_id: waba_id || null,
+            catalog_id: String(catalog_id),
+            access_token: access_token || null,
+            name: name || '',
+            updated_at: new Date().toISOString()
+        };
+        await db.collection('catalogs').doc(String(catalog_id)).set(data, { merge: true });
+        return { id: catalog_id, ...data };
+    },
+
+    async getAllCatalogs() {
+        const snapshot = await db.collection('catalogs').orderBy('updated_at', 'desc').get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async deleteCatalog(catalogId) {
+        await db.collection('catalogs').doc(String(catalogId)).delete();
+        // Also delete all products for this catalog
+        const snapshot = await db.collection('products').where('catalog_id', '==', String(catalogId)).get();
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+    },
+
+    // --- Products ---
+    async upsertProduct({ catalog_id, product_id, name, price, image_url, description, retailer_id }) {
+        const data = {
+            catalog_id: String(catalog_id),
+            product_id: String(product_id),
+            name: name || '',
+            price: price || '',
+            image_url: image_url || '',
+            description: description || '',
+            retailer_id: retailer_id || String(product_id),
+            updated_at: new Date().toISOString()
+        };
+        await db.collection('products').doc(String(product_id)).set(data, { merge: true });
+        return { id: product_id, ...data };
+    },
+
+    async getProductsByCatalog(catalogId) {
+        const snapshot = await db.collection('products')
+            .where('catalog_id', '==', String(catalogId))
+            .orderBy('updated_at', 'desc')
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async clearProductsForCatalog(catalogId) {
+        const snapshot = await db.collection('products').where('catalog_id', '==', String(catalogId)).get();
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
     }
 };
