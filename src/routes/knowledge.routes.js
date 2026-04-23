@@ -15,8 +15,9 @@ const router = express.Router();
 
 // ─── ROUTES: Knowledge Base (AI Training) ────────────────────────────────────
 
-const { parsePDF } = require('pdf-parse');
-const { parseCSV } = require('csv-parse');
+let pdfParse;
+try { pdfParse = require('pdf-parse'); } catch(e) { pdfParse = null; }
+const { parse: csvParse } = require('csv-parse/sync');
 
 router.get('/agents/:id/knowledge', async (req, res) => {
     const agentId = parseInt(req.params.id);
@@ -53,17 +54,13 @@ router.post('/agents/:id/knowledge/upload', uploadTraining.single('file'), async
         let recordCount = 0;
 
         if (fileType === 'pdf') {
-            const pdfData = await parsePDF(req.file.buffer);
+            if (!pdfParse) throw new Error('pdf-parse module not available');
+            const pdfData = await pdfParse(req.file.buffer);
             content = pdfData.text.substring(0, 100000);
             recordCount = pdfData.numpages || 1;
         } else {
             const csvContent = req.file.buffer.toString('utf-8');
-            const records = await new Promise((resolve, reject) => {
-                parseCSV(csvContent, { columns: true }, (err, records) => {
-                    if (err) reject(err);
-                    else resolve(records);
-                });
-            });
+            const records = csvParse(csvContent, { columns: true, skip_empty_lines: true });
             content = csvContent.substring(0, 100000);
             recordCount = records.length || 0;
         }
@@ -189,9 +186,7 @@ router.delete('/knowledge/:id', async (req, res) => {
         return res.status(404).json({ error: 'Knowledge entry not found' });
     }
 
-    if (knowledge.file_path && fs.existsSync(knowledge.file_path)) {
-        fs.unlinkSync(knowledge.file_path);
-    }
+    // Files are stored in Firebase Storage, not local disk
     await db.deleteKnowledge(id);
     res.json({ success: true });
 });

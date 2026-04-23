@@ -215,7 +215,7 @@ router.post('/webhook', async (req, res) => {
             // });
 
             // AI Agent: process incoming message if conversation is in AI mode
-            processIncomingMessage(contact.id, text, contact, io, mediaUrl, mediaMime)
+            processIncomingMessage(contact.id, text, contact, null, mediaUrl, mediaMime)
                 .then((aiMsg) => {
                     if (!aiMsg) return; // human mode or error
 
@@ -285,7 +285,7 @@ router.post('/simulate/receive', async (req, res) => {
     // });
 
     // AI Agent: process simulated incoming if conversation is in AI mode
-    processIncomingMessage(contact.id, text, contact, io)
+    processIncomingMessage(contact.id, text, contact, null)
         .then((aiMsg) => {
             if (!aiMsg) return;
             const aiFormatted = {
