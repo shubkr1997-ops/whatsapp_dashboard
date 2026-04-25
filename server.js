@@ -38,11 +38,14 @@ fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const TRAINING_DIR = path.join(__dirname, 'training_files');
 fs.mkdirSync(TRAINING_DIR, { recursive: true });
 
+<<<<<<< HEAD
 // Health check route for testing
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
 });
 
+=======
+>>>>>>> origin/main
 // Routes
 app.use('/api', require('./src/routes/contacts.routes'));
 app.use('/api', require('./src/routes/messages.routes'));
@@ -56,7 +59,11 @@ app.use('/api', require('./src/routes/catalog.routes'));
 app.use('/api', require('./src/routes/flows.routes'));
 
 // Fallback
+<<<<<<< HEAD
 app.get(/.*/, (req, res) => {
+=======
+app.get('/{*path}', (req, res) => {
+>>>>>>> origin/main
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 

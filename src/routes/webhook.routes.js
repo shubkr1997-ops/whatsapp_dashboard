@@ -244,6 +244,17 @@ router.post('/webhook', async (req, res) => {
                                     /* io.to.emit removed */
                                 }
                             })
+                            .catch(err => console.error('[AI Reply Error]', err.message));
+                    }
+                })
+                .catch(err => console.error('[AI Processing Error]', err.message));
+        });
+    } catch (err) {
+        console.error('[Webhook Error]', err.message);
+    }
+};
+
+}
                             .catch((err) => {
                                 console.error('[AI WhatsApp Send Error]', {
                                     message: err.message,
@@ -292,6 +303,7 @@ router.post('/simulate/receive', async (req, res) => {
                 id: aiMsg.id, type: 'outgoing', text: aiMsg.text,
                 status: aiMsg.status, time: formatTime(aiMsg.timestamp),
             };
+
             /* io.to.emit removed */
             /* io.emit removed */
             // });
