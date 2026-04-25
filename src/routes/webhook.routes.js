@@ -227,13 +227,6 @@ router.post('/webhook', async (req, res) => {
                         time:   formatTime(aiMsg.timestamp),
                     };
 
-                    // Broadcast AI reply to chat room
-                    /* io.to.emit removed */
-
-                    // Update sidebar
-                    /* io.emit removed */
-                    // });
-
                     // Send AI reply via WhatsApp API
                     if (contact.phone && !contact.is_group) {
                         whatsappService.sendViaWhatsApp(contact.phone, aiMsg.text)
@@ -241,34 +234,15 @@ router.post('/webhook', async (req, res) => {
                                 const waId = apiRes?.messages?.[0]?.id;
                                 if (waId && !apiRes.simulated) {
                                     await db.markMessageDelivered(aiMsg.id);
-                                    /* io.to.emit removed */
                                 }
                             })
                             .catch(err => console.error('[AI Reply Error]', err.message));
                     }
                 })
                 .catch(err => console.error('[AI Processing Error]', err.message));
-        });
-    } catch (err) {
-        console.error('[Webhook Error]', err.message);
-    }
-};
-
-}
-                            .catch((err) => {
-                                console.error('[AI WhatsApp Send Error]', {
-                                    message: err.message,
-                                    status: err.response?.status,
-                                    data: err.response?.data,
-                                    phone: contact.phone
-                                });
-                            });
-                    }
-                })
-                .catch((err) => console.error('[AI Engine] Processing error:', err.message));
         }
     } catch (err) {
-        console.error('[Webhook] Processing error:', err.message);
+        console.error('[Webhook Error]', err.message);
     }
 });
 
