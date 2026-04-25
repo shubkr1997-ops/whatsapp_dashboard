@@ -37,5 +37,16 @@
       ".firebaserc"
     ],
     "runtime": "nodejs20"
+  },
+  "apphosting": {
+    "source": ".",
+    "environment": "production",
+    "runConfig": {
+      "concurrency": 100,
+      "cpu": 1,
+      "memoryMiB": 512,
+      "minInstances": 0,
+      "maxInstances": 2
+    }
   }
 }

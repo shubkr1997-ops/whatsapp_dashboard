@@ -8,3 +8,6 @@ data/dashboard.db-shm
 data/dashboard.db-wal
 training_files/
 .DS_Store
+service-account.json
+.firebase/
+firebase-debug.log
