@@ -135,37 +135,7 @@ let currentTrainingAgentId = null;
 let editingAgentId = null; // null = creating new, number = editing existing
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
-
-
-/* socket event removed */
-
-/* socket event removed */
-
-/* socket event removed */
-
-/* socket event removed */
-
-    const contact = contacts.find(c => c.id === contactId);
-    console.log('[Socket] Found contact:', contact);
-
-    if (contact) {
-        contact.lastMessage = message.text;
-        contact.time        = message.time;
-    }
-
-    if (contactId === activeChatId) {
-        console.log('[Socket] Appending message to active chat');
-        appendMessageBubble(message, true);
-    } else {
-        console.log('[Socket] Message for inactive chat, updating unread count');
-        unreadCounts[contactId] = (unreadCounts[contactId] || 0) + 1;
-        if (contact) contact.unread = unreadCounts[contactId];
-        updateChatCard(contactId);
-        flashTabTitle(contact?.name || 'New message');
-    }
-
-    sortAndRenderChatList();
-});
+// Socket.io functionality has been removed in favor of Firestore real-time listeners
 
 /* socket event removed */
 
