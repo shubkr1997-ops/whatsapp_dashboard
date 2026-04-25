@@ -2,7 +2,6 @@
 
 const axios = require('axios');
 const { readGoogleSheetSchema, writeGoogleSheetSchema, executeReadSheet, executeWriteSheet } = require('./tools/googleSheetsMcp');
-const { sendCatalogSchema, sendFlowSchema, executeSendCatalog, executeSendFlow } = require('./tools/whatsappMcp');
 
 /**
  * Unified AI Provider Layer
@@ -11,7 +10,7 @@ const { sendCatalogSchema, sendFlowSchema, executeSendCatalog, executeSendFlow }
 
 // ─── OpenAI / ChatGPT ─────────────────────────────────────────────────────────
 
-async function callOpenAI({ messages, model = 'gpt-4o', temperature = 0.7, max_tokens = 1024, apiKey, mcpServers = [], contactPhone = null }) {
+async function callOpenAI({ messages, model = 'gpt-4o', temperature = 0.7, max_tokens = 1024, apiKey, mcpServers = [] }) {
     let formattedMessages = messages.map(m => {
         if (m.images && m.images.length > 0) {
             return {
@@ -39,16 +38,6 @@ async function callOpenAI({ messages, model = 'gpt-4o', temperature = 0.7, max_t
     if (hasGoogleSheet) {
         tools.push({ type: 'function', function: readGoogleSheetSchema });
         tools.push({ type: 'function', function: writeGoogleSheetSchema });
-    }
-
-    let hasWhatsappCatalog = mcpServers.some(s => s.type === 'whatsapp_catalog');
-    if (hasWhatsappCatalog) {
-        tools.push({ type: 'function', function: sendCatalogSchema });
-    }
-
-    let hasWhatsappFlow = mcpServers.some(s => s.type === 'whatsapp_flow');
-    if (hasWhatsappFlow) {
-        tools.push({ type: 'function', function: sendFlowSchema });
     }
 
     let hasMoreTools = false;
@@ -102,22 +91,6 @@ async function callOpenAI({ messages, model = 'gpt-4o', temperature = 0.7, max_t
                         } else {
                             toolResult = "Error: Configured Google Sheet MCP Server not found.";
                         }
-                    } else if (funcName === 'send_whatsapp_catalog') {
-                        const catalogConfig = mcpServers.find(s => s.type === 'whatsapp_catalog');
-                        if (catalogConfig) {
-                            try {
-                                const config = JSON.parse(catalogConfig.config_json);
-                                toolResult = await executeSendCatalog(config, args, contactPhone);
-                            } catch (e) { toolResult = `Error: ${e.message}`; }
-                        } else { toolResult = "Error: Catalog tool not configured."; }
-                    } else if (funcName === 'send_whatsapp_flow') {
-                        const flowConfig = mcpServers.find(s => s.type === 'whatsapp_flow');
-                        if (flowConfig) {
-                            try {
-                                const config = JSON.parse(flowConfig.config_json);
-                                toolResult = await executeSendFlow(config, args, contactPhone);
-                            } catch (e) { toolResult = `Error: ${e.message}`; }
-                        } else { toolResult = "Error: Flow tool not configured."; }
                     }
 
                     formattedMessages.push({
@@ -320,13 +293,13 @@ async function getLMStudioModels(baseUrl = 'http://localhost:1234') {
  * @param {string} opts.baseUrl - Custom base URL for local providers (ollama, lmstudio)
  * @returns {Promise<string>} The assistant's reply text
  */
-async function generateChatCompletion({ provider, model, messages, temperature, max_tokens, baseUrl, mcpServers = [], contactPhone = null }) {
+async function generateChatCompletion({ provider, model, messages, temperature, max_tokens, baseUrl, mcpServers = [] }) {
     switch (provider) {
         case 'openai':
         case 'chatgpt': {
             const apiKey = process.env.OPENAI_API_KEY;
             if (!apiKey) throw new Error('OPENAI_API_KEY not set in environment');
-            return callOpenAI({ messages, model: model || 'gpt-4o', temperature, max_tokens, apiKey, mcpServers, contactPhone });
+            return callOpenAI({ messages, model: model || 'gpt-4o', temperature, max_tokens, apiKey, mcpServers });
         }
 
         case 'gemini': {

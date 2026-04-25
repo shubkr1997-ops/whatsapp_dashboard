@@ -42,164 +42,179 @@
     </script>
 </head>
 <body>
-    <!-- Sidebar -->
-    <div id="sidebar">
-        <div id="sidebarHeader">
-            <div id="userProfile">
-                <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" alt="Profile">
-                <div id="userInfo">
-                    <div id="userName">Dashboard</div>
-                    <div id="userStatus">Online</div>
-                </div>
-            </div>
-            <button id="btnSettings" title="Settings">
-                <i data-lucide="settings"></i>
-            </button>
-        </div>
+    <!-- Premium Background Effects -->
+    <div class="bg-glow"></div>
 
-        <!-- Search -->
-        <div id="searchContainer">
-            <input type="text" id="chatSearch" placeholder="Search chats...">
-        </div>
-
-        <!-- Filter Pills -->
-        <div id="filterPills">
-            <button class="filter-pill active" data-filter="all">All</button>
-            <button class="filter-pill" data-filter="unread">Unread</button>
-            <button class="filter-pill" data-filter="favorites">Favorites</button>
-        </div>
-
-        <!-- Chat List -->
-        <div id="chatList"></div>
-    </div>
-
-    <!-- Main Content Area -->
-    <div id="mainContent">
-        <!-- Welcome Screen -->
-        <div id="welcomeScreen">
-            <div class="welcome-content">
-                <i data-lucide="message-circle" class="welcome-icon"></i>
-                <h1>Welcome to WhatsApp Dashboard</h1>
-                <p>Select a conversation to start messaging</p>
-                <div class="welcome-actions">
-                    <button id="newChatBtn" class="primary-btn">
-                        <i data-lucide="plus"></i>
-                        New Chat
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Chat Area -->
-        <div id="chatArea" style="display: none;">
-            <!-- Chat Header -->
-            <div id="chatHeader">
-                <div id="contactInfo">
-                    <img id="headerAvatar" src="" alt="Contact">
-                    <div id="contactDetails">
-                        <div id="headerName"></div>
-                        <div id="headerStatus"></div>
+    <div class="app-wrapper">
+        <!-- Sidebar / Chat List Panel -->
+        <div id="sidebar" class="chat-list-panel">
+            <div id="sidebarHeader" class="panel-header">
+                <div id="userProfile" class="user-avatar-main">
+                    <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" alt="Profile">
+                    <div id="userInfo">
+                        <div id="userName">Dashboard</div>
+                        <div id="userStatus">Online</div>
                     </div>
                 </div>
-                <div class="chat-actions">
-                    <button id="modeToggleBtn" title="Toggle AI Mode">
-                        <i id="modeIcon" data-lucide="bot"></i>
-                        <span id="modeLabel">AI</span>
-                    </button>
-                    <button id="btnDetails" title="Contact Details">
-                        <i data-lucide="info"></i>
+                <div class="header-actions">
+                    <button id="btnSettings" class="icon-btn" title="Settings">
+                        <i data-lucide="settings"></i>
                     </button>
                 </div>
             </div>
 
-            <!-- Messages Container -->
-            <div id="messagesContainer">
-                <div id="chatMessages"></div>
+            <!-- Search Area -->
+            <div id="searchContainer" class="search-bar-container">
+                <div class="search-input-wrapper">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="chatSearch" placeholder="Search or start new chat">
+                </div>
             </div>
 
-            <!-- Message Input -->
-            <div id="messageInputContainer">
-                <div class="input-wrapper">
-                    <button id="plusBtn" title="Attach">
-                        <i data-lucide="plus"></i>
+            <!-- Filter Pills -->
+            <div id="filterPills" class="filter-pills-container">
+                <button class="filter-pill active" data-filter="all">All</button>
+                <button class="filter-pill" data-filter="unread">Unread</button>
+                <button class="filter-pill" data-filter="favorites">Favorites</button>
+            </div>
+
+            <!-- Chat List Scrollable -->
+            <div id="chatList" class="chats-scroll-area"></div>
+        </div>
+
+        <!-- Main Content Area / Chat Window -->
+        <div id="mainContent" class="active-conversation-panel">
+            <!-- Welcome Screen -->
+            <div id="welcomeScreen" class="welcome-screen">
+                <div class="welcome-content">
+                    <div class="welcome-illustration"></div>
+                    <h2>Welcome to WhatsApp Dashboard</h2>
+                    <p>Select a conversation to start messaging across your team</p>
+                    <div class="welcome-actions">
+                        <button id="btnNewChat" class="premium-btn">
+                            <i data-lucide="plus"></i>
+                            Start New Chat
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Chat Area -->
+            <div id="chatArea" class="chat-area" style="display: none;">
+                <!-- Chat Header -->
+                <div id="chatHeader" class="chat-header">
+                    <div id="contactInfo" class="chat-contact-info">
+                        <img id="headerAvatar" src="" alt="Contact" class="contact-avatar">
+                        <div class="contact-details">
+                            <h3 id="headerName"></h3>
+                            <p id="headerStatus"></p>
+                        </div>
+                    </div>
+                    <div class="chat-actions">
+                        <button id="backBtn" class="icon-btn mobile-only" title="Back to list">
+                            <i data-lucide="arrow-left"></i>
+                        </button>
+                        <button id="modeToggleBtn" class="mode-toggle-btn" title="Toggle AI Mode">
+                            <i id="modeIcon" data-lucide="bot"></i>
+                            <span id="modeLabel">AI Agent</span>
+                        </button>
+                        <button id="chatSearchBtn" class="icon-btn" title="Search in chat">
+                            <i data-lucide="search"></i>
+                        </button>
+                        <button id="openDetails" class="icon-btn" title="Contact Details">
+                            <i data-lucide="info"></i>
+                        </button>
+                        <button id="chatMenuBtn" class="icon-btn" title="More options">
+                            <i data-lucide="more-vertical"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages Container -->
+                <div id="messagesContainer" class="messages-container">
+                    <div id="chatMessages" class="messages-flow"></div>
+                </div>
+
+                <!-- Message Input Area -->
+                <div id="messageInputContainer" class="chat-footer">
+                    <div class="footer-actions-left">
+                        <button id="plusBtn" class="icon-btn" title="Attach">
+                            <i data-lucide="plus"></i>
+                        </button>
+                        <button id="btnEmoji" class="icon-btn" title="Emojis">
+                            <i data-lucide="smile"></i>
+                        </button>
+                    </div>
+                    <div class="message-input-wrapper">
+                        <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                        
+                        <!-- Voice Recording UI Overlay -->
+                        <div id="recordingUI" class="recording-ui hidden">
+                            <div class="recording-dot"></div>
+                            <span class="recording-timer">0:00</span>
+                            <span class="recording-tip">Slide to cancel</span>
+                        </div>
+                    </div>
+                    <div class="footer-actions-right">
+                        <button id="micBtn" class="icon-btn mic-btn" title="Voice Message">
+                            <i data-lucide="mic"></i>
+                        </button>
+                        <button id="sendBtn" class="send-btn" title="Send message" disabled>
+                            <i data-lucide="send"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rights Panels / Overlays -->
+        <div id="detailsPanel" class="side-panel details-panel">
+            <div class="panel-header-sub">
+                <h3>Contact Details</h3>
+                <button id="closeDetails" class="close-panel-btn">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="panel-scroll-content">
+                <div class="contact-profile-box">
+                    <img id="detailsAvatar" src="" alt="Contact" class="large-avatar">
+                    <h4 id="detailsName"></h4>
+                    <p id="detailsPhone"></p>
+                    <p id="detailsAbout"></p>
+                </div>
+                <div class="panel-action-grid">
+                    <button id="btnFavorite" class="glass-action-btn">
+                        <i data-lucide="star"></i>
+                        <span>Favorite</span>
                     </button>
-                    <input type="text" id="messageInput" placeholder="Type a message...">
-                    <button id="micBtn" title="Voice Message">
-                        <i data-lucide="mic"></i>
-                    </button>
-                    <button id="sendBtn" title="Send" disabled>
-                        <i data-lucide="send"></i>
+                    <button id="btnClearHistory" class="glass-action-btn danger">
+                        <i data-lucide="trash-2"></i>
+                        <span>Clear History</span>
                     </button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Details Panel -->
-    <div id="detailsPanel">
-        <div class="details-header">
-            <h3>Contact Details</h3>
-            <button id="closeDetails">
-                <i data-lucide="x"></i>
-            </button>
-        </div>
-        <div class="details-content">
-            <div class="contact-avatar">
-                <img id="detailsAvatar" src="" alt="Contact">
-            </div>
-            <div class="contact-info">
-                <h4 id="detailsName"></h4>
-                <p id="detailsPhone"></p>
-                <p id="detailsAbout"></p>
-            </div>
-            <div class="details-actions">
-                <button id="btnFavorite" class="action-btn">
-                    <i data-lucide="star"></i>
-                    Favorite
-                </button>
-                <button id="btnClearHistory" class="action-btn">
-                    <i data-lucide="trash-2"></i>
-                    Clear History
+        <!-- Settings Drawer -->
+        <div id="settingsDrawer" class="settings-drawer">
+            <div class="settings-drawer-header">
+                <h3>Settings</h3>
+                <button id="closeSettings" class="icon-btn">
+                    <i data-lucide="x"></i>
                 </button>
             </div>
+            <div class="settings-drawer-content">
+                <!-- Data populated via JS -->
+            </div>
         </div>
     </div>
 
-    <!-- Settings Drawer -->
-    <div id="settingsDrawer">
-        <div class="settings-header">
-            <h3>Settings</h3>
-            <button id="closeSettings">
-                <i data-lucide="x"></i>
-            </button>
-        </div>
-        <div class="settings-content">
-            <!-- Settings content will be populated by JS -->
-        </div>
-    </div>
-
-    <!-- Modals and Overlays -->
-    <div id="attachmentMenu" class="modal-overlay" style="display: none;">
-        <div class="attachment-options">
-            <button class="attachment-option" data-type="image">
-                <i data-lucide="image"></i>
-                Image
-            </button>
-            <button class="attachment-option" data-type="video">
-                <i data-lucide="video"></i>
-                Video
-            </button>
-            <button class="attachment-option" data-type="document">
-                <i data-lucide="file-text"></i>
-                Document
-            </button>
-        </div>
-    </div>
-
-    <div id="recordingUI" style="display: none;">
-        <div class="recording-indicator">
-            <i data-lucide="mic"></i>
-            <span>Recording...</span>
+    <!-- Modals -->
+    <div id="attachmentMenu" class="glass-modal" style="display: none;">
+        <div class="attachment-grid">
+            <button class="attach-item" data-type="image"><i data-lucide="image"></i><span>Photos</span></button>
+            <button class="attach-item" data-type="video"><i data-lucide="video"></i><span>Videos</span></button>
+            <button class="attach-item" data-type="document"><i data-lucide="file-text"></i><span>Documents</span></button>
         </div>
     </div>
 
@@ -208,10 +223,8 @@
     <input type="file" id="videoInput" accept="video/*" style="display: none;">
     <input type="file" id="documentInput" accept="application/pdf,text/*" style="display: none;">
 
-    <!-- Scripts -->
     <script src="app.js"></script>
     <script>
-        // Initialize Lucide icons
         lucide.createIcons();
     </script>
 </body>

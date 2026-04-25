@@ -294,5 +294,182 @@ module.exports = {
         const batch = db.batch();
         snapshot.docs.forEach(doc => batch.delete(doc.ref));
         await batch.commit();
+    },
+
+    // --- Knowledge Management ---
+    async getKnowledgeByAgent(agentId) {
+        const snapshot = await db.collection('knowledge')
+            .where('agent_config_id', '==', String(agentId))
+            .orderBy('created_at', 'desc')
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async addKnowledge({ agent_config_id, type, name, content, config_json }) {
+        const data = {
+            agent_config_id: String(agent_config_id),
+            type,
+            name,
+            content: content || '',
+            config_json: config_json || '{}',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        const ref = await db.collection('knowledge').add(data);
+        return { id: ref.id, ...data };
+    },
+
+    async getKnowledgeById(id) {
+        const doc = await db.collection('knowledge').doc(String(id)).get();
+        return doc.exists ? { id: doc.id, ...doc.data() } : null;
+    },
+
+    async updateKnowledge(id, updates) {
+        const data = { ...updates, updated_at: new Date().toISOString() };
+        await db.collection('knowledge').doc(String(id)).update(data);
+        return { id, ...data };
+    },
+
+    async deleteKnowledge(id) {
+        await db.collection('knowledge').doc(String(id)).delete();
+    },
+
+    // --- Flows ---
+    async getAllFlows() {
+        const snapshot = await db.collection('flows').orderBy('created_at', 'desc').get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async getFlowByFlowId(flowId) {
+        const snapshot = await db.collection('flows').where('flow_id', '==', String(flowId)).limit(1).get();
+        if (snapshot.empty) return null;
+        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    },
+
+    async createFlow({ flow_id, name, description, category, flow_json, status }) {
+        const data = {
+            flow_id: String(flow_id),
+            name,
+            description: description || '',
+            category: category || 'CUSTOMER_SUPPORT',
+            flow_json: flow_json || '{}',
+            status: status || 'DRAFT',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        const ref = await db.collection('flows').add(data);
+        return { id: ref.id, ...data };
+    },
+
+    async updateFlow(flowId, updates) {
+        const data = { ...updates, updated_at: new Date().toISOString() };
+        const snapshot = await db.collection('flows').where('flow_id', '==', String(flowId)).limit(1).get();
+        if (!snapshot.empty) {
+            await db.collection('flows').doc(snapshot.docs[0].id).update(data);
+        }
+        return { flow_id: flowId, ...data };
+    },
+
+    async updateFlowMetaId(flowId, metaFlowId) {
+        const data = { meta_flow_id: metaFlowId, updated_at: new Date().toISOString() };
+        const snapshot = await db.collection('flows').where('flow_id', '==', String(flowId)).limit(1).get();
+        if (!snapshot.empty) {
+            await db.collection('flows').doc(snapshot.docs[0].id).update(data);
+        }
+        return { flow_id: flowId, ...data };
+    },
+
+    async updateFlowStatus(flowId, status) {
+        const data = { status, updated_at: new Date().toISOString() };
+        const snapshot = await db.collection('flows').where('flow_id', '==', String(flowId)).limit(1).get();
+        if (!snapshot.empty) {
+            await db.collection('flows').doc(snapshot.docs[0].id).update(data);
+        }
+        return { flow_id: flowId, ...data };
+    },
+
+    async deleteFlow(flowId) {
+        const snapshot = await db.collection('flows').where('flow_id', '==', String(flowId)).limit(1).get();
+        if (!snapshot.empty) {
+            await db.collection('flows').doc(snapshot.docs[0].id).delete();
+        }
+    },
+
+    async saveFlowResponse({ flow_id, contact_id, screen_id, response_json }) {
+        const data = {
+            flow_id: String(flow_id),
+            contact_id: String(contact_id),
+            screen_id,
+            response_json: response_json || '{}',
+            created_at: new Date().toISOString()
+        };
+        const ref = await db.collection('flow_responses').add(data);
+        return { id: ref.id, ...data };
+    },
+
+    async getFlowResponses(flowId) {
+        const snapshot = await db.collection('flow_responses')
+            .where('flow_id', '==', String(flowId))
+            .orderBy('created_at', 'desc')
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async getFlowResponsesByContact(flowId, contactId) {
+        const snapshot = await db.collection('flow_responses')
+            .where('flow_id', '==', String(flowId))
+            .where('contact_id', '==', String(contactId))
+            .orderBy('created_at', 'desc')
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    // --- Calls ---
+    async getAllCalls() {
+        const snapshot = await db.collection('calls').orderBy('created_at', 'desc').get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async getCallsByContact(contactId) {
+        const snapshot = await db.collection('calls')
+            .where('contact_id', '==', String(contactId))
+            .orderBy('created_at', 'desc')
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+
+    async createCall({ contact_id, type, direction, status }) {
+        const data = {
+            contact_id: String(contact_id),
+            type,
+            direction,
+            status,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        const ref = await db.collection('calls').add(data);
+        return { id: ref.id, ...data };
+    },
+
+    async getCallById(id) {
+        const doc = await db.collection('calls').doc(String(id)).get();
+        return doc.exists ? { id: doc.id, ...doc.data() } : null;
+    },
+
+    async updateCallStatus(id, status, duration, ended_at) {
+        const data = {
+            status,
+            duration: duration || 0,
+            ended_at: ended_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        await db.collection('calls').doc(String(id)).update(data);
+        return { id, ...data };
+    },
+
+    // --- MCP Servers ---
+    async getMcpServerById(id) {
+        const doc = await db.collection('mcp_servers').doc(String(id)).get();
+        return doc.exists ? { id: doc.id, ...doc.data() } : null;
     }
 };

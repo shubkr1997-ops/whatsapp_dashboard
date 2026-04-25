@@ -185,6 +185,12 @@
                         <button class="ai-action-btn" id="btnAddGoogleSheetMcp" style="border-radius:20px; padding:6px 14px; font-size:12px;">
                             <i data-lucide="table" size="14"></i> Add Google Sheet
                         </button>
+                        <button class="ai-action-btn" id="btnAddWhatsappCatalogMcp" style="border-radius:20px; padding:6px 14px; font-size:12px; margin-left: 8px;">
+                            <i data-lucide="shopping-bag" size="14"></i> Add Catalog
+                        </button>
+                        <button class="ai-action-btn" id="btnAddWhatsappFlowMcp" style="border-radius:20px; padding:6px 14px; font-size:12px; margin-left: 8px;">
+                            <i data-lucide="git-branch" size="14"></i> Add Flow
+                        </button>
                     </div>
                     
                     <div id="mcpServersList" style="margin-top: 16px; display:flex; flex-direction:column; gap:8px;">
@@ -231,6 +237,64 @@
                 <div class="form-actions" style="margin-top:24px;">
                     <button class="ai-action-btn primary" id="btnSaveMcpSheet">Save Integration</button>
                     <button class="ai-action-btn" id="btnCancelMcpSheet">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Catalog Modal -->
+    <div class="modal-overlay hidden" id="mcpWhatsappCatalogModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add WhatsApp Catalog Tool</h3>
+                <button class="icon-btn" id="closeCatalogMcpModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Integration Name</label>
+                    <input type="text" id="mcpCatalogName" class="form-input" placeholder="e.g. Main Product Catalog">
+                </div>
+                <div class="form-group">
+                    <label>Optional Default Catalog ID</label>
+                    <input type="text" id="mcpCatalogId" class="form-input" placeholder="Enter Catalog ID">
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="mcpCatalogSend" checked> Allow AI to send products to customers
+                    </label>
+                </div>
+                <div class="form-actions" style="margin-top:24px;">
+                    <button class="ai-action-btn primary" id="btnSaveMcpCatalog">Save Integration</button>
+                    <button class="ai-action-btn" id="btnCancelMcpCatalog">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WhatsApp Flow Modal -->
+    <div class="modal-overlay hidden" id="mcpWhatsappFlowModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add WhatsApp Flow Tool</h3>
+                <button class="icon-btn" id="closeFlowMcpModal"><i data-lucide="x" size="20"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Integration Name</label>
+                    <input type="text" id="mcpFlowName" class="form-input" placeholder="e.g. Lead Gen Flow">
+                </div>
+                <div class="form-group">
+                    <label>Optional Default Flow ID</label>
+                    <input type="text" id="mcpFlowId" class="form-input" placeholder="Enter Flow ID">
+                </div>
+                <div class="form-group" style="margin-top:16px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="mcpFlowSend" checked> Allow AI to send flows to customers
+                    </label>
+                </div>
+                <div class="form-actions" style="margin-top:24px;">
+                    <button class="ai-action-btn primary" id="btnSaveMcpFlow">Save Integration</button>
+                    <button class="ai-action-btn" id="btnCancelMcpFlow">Cancel</button>
                 </div>
             </div>
         </div>

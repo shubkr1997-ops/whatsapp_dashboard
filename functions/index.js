@@ -1,28 +1,32 @@
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v2');
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const axios = require('axios');
+const multer = require('multer');
 const admin = require('firebase-admin');
-require('dotenv').config();
 
 // Initialize Firebase Admin
-admin.initializeApp();
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
+const bucket = admin.storage().bucket();
 
-// Import existing modules
+// Local modules (now inside functions directory)
 const db = require('./data/db');
 const { processIncomingMessage, AGENT_PROMPTS } = require('./ai/engine');
 
-// Create Express app
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Import all the routes from server.js logic
-// For brevity, I'll include the key routes here
+// Note: Hosting will handle static files in public/, but rewrites in firebase.json 
+// can point to this function if needed.
 
-// ─── Helper functions (copied from server.js) ────────────────────────────────
-
+// ─── Helper: Format timestamp for display ────────────────────────────────────
 function formatTime(isoString) {
     if (!isoString) return '';
     const d = new Date(isoString);
@@ -37,292 +41,153 @@ function formatTime(isoString) {
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// ─── Routes ─────────────────────────────────────────────────────────────────
+// ─── Helper: Send via WhatsApp Cloud API (Meta) ───────────────────────────────
+async function sendViaWhatsApp(toPhone, text) {
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const accessToken   = process.env.WHATSAPP_ACCESS_TOKEN;
 
-// GET /api/contacts — list all (lightweight, no messages)
+    if (!phoneNumberId || !accessToken) {
+        console.log('[WhatsApp] No API credentials set — skipping external send.');
+        return { simulated: true };
+    }
+
+    const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`;
+    const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: toPhone.replace(/\D/g, ''),
+        type: 'text',
+        text: { preview_url: false, body: text },
+    };
+
+    const response = await axios.post(url, payload, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+    });
+
+    return response.data;
+}
+
+// Routes from server.js (adapted for async/await)
 app.get('/api/contacts', async (req, res) => {
     try {
         const raw = await db.getAllContacts();
-        const contacts = raw.map(c => ({
-            id: c.id,
-            name: c.name,
-            phone: c.phone,
-            avatar: c.avatar,
-            status: c.status,
-            about: c.about,
-            is_group: c.is_group,
-            is_favorite: c.is_favorite,
-            lastMessage: c.lastMessage || '',
+        const contactsWithTime = raw.map(c => ({
+            ...c,
             time: formatTime(c.lastTime),
-            unread: c.unread || 0,
         }));
-        res.json(contacts);
+        res.json(contactsWithTime);
     } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// GET /api/contacts/:id — full contact + messages
 app.get('/api/contacts/:id', async (req, res) => {
     try {
-        const id = parseInt(req.params.id);
+        const id = req.params.id;
         const contact = await db.getContactById(id);
         if (!contact) return res.status(404).json({ error: 'Contact not found' });
-
-        // Mark all incoming messages as read
         await db.markMessagesRead(id);
-
         const rawMsgs = await db.getMessages(id);
-        const messages = rawMsgs.map(m => ({
-            id: m.id,
-            type: m.type,
-            text: m.text,
-            media_type: m.media_type || 'text',
-            media_url: m.media_url,
-            caption: m.caption,
-            status: m.status,
-            time: formatTime(m.timestamp),
-        }));
-
+        const messages = rawMsgs.map(m => ({ ...m, time: formatTime(m.timestamp) }));
         res.json({ ...contact, messages });
     } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// POST /api/contacts — create a new contact
 app.post('/api/contacts', async (req, res) => {
     try {
-        const { name, phone, avatar, status, about, is_group } = req.body;
-        if (!name) return res.status(400).json({ error: 'name is required' });
-
-        // Prevent duplicate phone numbers
-        if (phone) {
-            const existing = await db.getContactByPhone(phone);
-            if (existing) return res.status(409).json({ error: 'Contact with this phone already exists', contact: existing });
-        }
-
-        const contact = await db.createContact({ name, phone, avatar, status, about, is_group });
+        const contact = await db.createContact(req.body);
         res.status(201).json(contact);
     } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// PUT /api/contacts/:id/favorite — toggle favorite status
 app.put('/api/contacts/:id/favorite', async (req, res) => {
     try {
-        const id = parseInt(req.params.id);
-        const { is_favorite } = req.body;
-
-        const contact = await db.getContactById(id);
-        if (!contact) return res.status(404).json({ error: 'Contact not found' });
-
-        await db.updateFavorite(id, is_favorite);
-
-        res.json({ success: true, is_favorite: is_favorite ? 1 : 0 });
+        await db.updateFavorite(req.params.id, req.body.is_favorite);
+        res.json({ success: true });
     } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// GET /api/agents — list all agent configs
-app.get('/api/agents', async (req, res) => {
+// Multer and Storage logic
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+app.post('/api/contacts/:id/upload', upload.single('file'), async (req, res) => {
     try {
-        res.json(await db.getAllAgentConfigs());
-    } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// GET /api/agents/types — available agent types
-app.get('/api/agents/types', (req, res) => {
-    const types = Object.keys(AGENT_PROMPTS).map(key => ({
-        type: key,
-        label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        defaultPrompt: AGENT_PROMPTS[key],
-    }));
-    res.json(types);
-});
-
-// POST /api/agents — create new agent config
-app.post('/api/agents', async (req, res) => {
-    try {
-        const { name, agent_type, provider, model, system_prompt, temperature, max_tokens, base_url, is_default } = req.body;
-        if (!name || !agent_type || !provider) {
-            return res.status(400).json({ error: 'name, agent_type, and provider are required' });
-        }
-        const prompt = system_prompt || AGENT_PROMPTS[agent_type] || AGENT_PROMPTS.custom;
-        const agent = await db.createAgentConfig({
-            name, agent_type, provider,
-            model: model || undefined,
-            system_prompt: prompt,
-            temperature: temperature ?? undefined,
-            max_tokens: max_tokens ?? undefined,
-            base_url: base_url || null,
-            is_default: is_default ? 1 : 0,
-        });
-        res.status(201).json(agent);
-    } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// PUT /api/contacts/:id/mode — set conversation mode
-app.put('/api/contacts/:id/mode', async (req, res) => {
-    try {
-        const contactId = parseInt(req.params.id);
-        const contact = await db.getContactById(contactId);
-        if (!contact) return res.status(404).json({ error: 'Contact not found' });
-
-        const { mode, agent_config_id, auto_handover } = req.body;
-        if (mode && !['human', 'ai'].includes(mode)) {
-            return res.status(400).json({ error: 'mode must be "human" or "ai"' });
-        }
-
-        const result = await db.setConversationMode({
-            contact_id: contactId,
-            mode: mode || 'human',
-            agent_config_id: agent_config_id || null,
-            auto_handover: auto_handover ? 1 : 0,
-        });
-
-        res.json(result);
-    } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// POST /api/contacts/:id/messages — send a text message
-app.post('/api/contacts/:id/messages', async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-        const { text, media_type, media_url, caption } = req.body;
-
-        if (!text || !text.trim()) {
-            if (!media_url) return res.status(400).json({ error: 'text or media_url is required' });
-        }
-
-        const contact = await db.getContactById(id);
-        if (!contact) return res.status(404).json({ error: 'Contact not found' });
-
-        // Save to DB as 'sent'
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const id = req.params.id;
+        const filename = `media_${Date.now()}_${path.basename(req.file.originalname)}`;
+        const file = bucket.file(`uploads/${filename}`);
+        await file.save(req.file.buffer, { metadata: { contentType: req.file.mimetype } });
+        await file.makePublic();
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/uploads/${filename}`;
+        
         const savedMsg = await db.addMessage({
             contact_id: id,
             type: 'outgoing',
-            text: (text || caption || '').trim(),
-            media_type: media_type || 'text',
-            media_url: media_url || null,
-            caption: caption || null,
-            status: 'sent',
+            text: req.body.caption || '',
+            media_type: req.file.mimetype.startsWith('video/') ? 'video' : 'image',
+            media_url: publicUrl,
+            status: 'sent'
         });
-
-        const formatted = {
-            id: savedMsg.id,
-            type: 'outgoing',
-            text: savedMsg.text,
-            media_type: savedMsg.media_type,
-            media_url: savedMsg.media_url,
-            caption: savedMsg.caption,
-            status: savedMsg.status,
-            time: formatTime(savedMsg.timestamp),
-        };
-
-        // Send via WhatsApp API (simplified - would need full implementation)
-        // For now, just return the message
-
-        res.status(201).json(formatted);
+        res.status(201).json(savedMsg);
     } catch (err) {
-        console.error('[API Error]', err);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Export the Express app as a Firebase Function
-exports.api = functions.https.onRequest(app);
-
-// Separate webhook function for better performance
-exports.webhook = functions.https.onRequest(async (req, res) => {
-    // Webhook logic here - simplified version
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+// Webhook handling
+app.get('/api/webhook', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    if (mode && token) {
+        if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
+            res.status(200).send(challenge);
+        } else {
+            res.sendStatus(403);
+        }
     }
+});
 
-    // Always respond 200 fast to prevent retries
+app.post('/api/webhook', async (req, res) => {
+    // Respond quickly to Meta
     res.status(200).send('EVENT_RECEIVED');
-
+    
     try {
-        // Process webhook payload
         const entry = req.body?.entry?.[0];
         const change = entry?.changes?.[0]?.value;
-        const msgArr = change?.messages;
+        const messages = change?.messages;
+        if (!messages) return;
 
-        if (!msgArr || msgArr.length === 0) return;
-
-        for (const waMeta of msgArr) {
-            const fromPhone = waMeta.from;
-            const msgType = waMeta.type;
-
-            let text = '';
-            let mediaType = 'text';
-            let mediaUrl = null;
-            let waMediaId = null;
-
-            if (msgType === 'text') {
-                text = waMeta.text?.body || '';
-            } else if (msgType === 'image') {
-                const imageData = waMeta.image;
-                waMediaId = imageData?.id;
-                const caption = imageData?.caption || '';
-                mediaType = 'image';
-                text = caption || '[Image]';
-            } else {
-                text = `[${msgType}]`;
-            }
-
-            // Normalise phone
-            const normPhone = `+${fromPhone}`;
-
-            let contact = await db.getContactByPhone(normPhone);
-
-            // Auto-create contact if not found
+        for (const msg of messages) {
+            const from = msg.from;
+            const text = msg.text?.body || '';
+            let contact = await db.getContactByPhone(`+${from}`);
             if (!contact) {
-                contact = await db.createContact({
-                    name: normPhone,
-                    phone: normPhone,
-                    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${fromPhone}`,
-                    status: 'Online',
-                });
+                contact = await db.createContact({ name: from, phone: `+${from}` });
             }
-
-            // Persist message
             await db.addMessage({
                 contact_id: contact.id,
                 type: 'incoming',
                 text,
-                media_type: mediaType,
-                media_url: mediaUrl,
-                status: 'delivered',
+                status: 'delivered'
             });
-
-            // AI processing (fire-and-forget)
-            processIncomingMessage(contact.id, text, contact, null, mediaUrl, null)
-                .then((aiMsg) => {
-                    if (!aiMsg) return;
-                    // Send AI reply via WhatsApp API
-                    // Note: In Firebase Functions, WhatsApp API calls need proper error handling
-                    console.log('[AI] Would send reply:', aiMsg.text);
-                })
-                .catch((err) => console.error('[AI Engine] Processing error:', err.message));
+            // AI logic
+            await processIncomingMessage(contact.id, text, contact, null);
         }
     } catch (err) {
-        console.error('[Webhook] Processing error:', err.message);
+        console.error('[Webhook Error]', err.message);
     }
 });
+
+// Final Export
+exports.api = functions.https.onRequest({ cors: true }, app);

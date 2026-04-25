@@ -44,6 +44,26 @@ const mcpSheetCreds        = document.getElementById('mcpSheetCreds');
 const mcpSheetRead         = document.getElementById('mcpSheetRead');
 const mcpSheetWrite        = document.getElementById('mcpSheetWrite');
 
+// WhatsApp Catalog
+const btnAddWhatsappCatalogMcp = document.getElementById('btnAddWhatsappCatalogMcp');
+const mcpWhatsappCatalogModal  = document.getElementById('mcpWhatsappCatalogModal');
+const closeCatalogMcpModal     = document.getElementById('closeCatalogMcpModal');
+const btnSaveMcpCatalog        = document.getElementById('btnSaveMcpCatalog');
+const btnCancelMcpCatalog      = document.getElementById('btnCancelMcpCatalog');
+const mcpCatalogName           = document.getElementById('mcpCatalogName');
+const mcpCatalogId             = document.getElementById('mcpCatalogId');
+const mcpCatalogSend           = document.getElementById('mcpCatalogSend');
+
+// WhatsApp Flow
+const btnAddWhatsappFlowMcp    = document.getElementById('btnAddWhatsappFlowMcp');
+const mcpWhatsappFlowModal     = document.getElementById('mcpWhatsappFlowModal');
+const closeFlowMcpModal        = document.getElementById('closeFlowMcpModal');
+const btnSaveMcpFlow           = document.getElementById('btnSaveMcpFlow');
+const btnCancelMcpFlow         = document.getElementById('btnCancelMcpFlow');
+const mcpFlowName              = document.getElementById('mcpFlowName');
+const mcpFlowId                = document.getElementById('mcpFlowId');
+const mcpFlowSend              = document.getElementById('mcpFlowSend');
+
 // ─── Initialization ───────────────────────────────────────────────────────────
 async function init() {
     try {
@@ -141,15 +161,20 @@ function renderMcpServers() {
 
         const item = document.createElement('div');
         item.style.cssText = 'display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);';
+        const icon = server.type === 'google_sheet' ? 'table' : (server.type === 'whatsapp_catalog' ? 'shopping-bag' : 'git-branch');
         
         item.innerHTML = `
             <div style="display:flex; gap: 12px; align-items:center;">
                 <div style="background: rgba(255,255,255,0.1); padding: 8px; border-radius: 6px;">
-                    <i data-lucide="table" size="18"></i>
+                    <i data-lucide="${icon}" size="18"></i>
                 </div>
                 <div>
                     <div style="font-size: 14px; font-weight: 500;">${server.name}</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Google Sheet • R: ${config.allow_read ? 'Yes' : 'No'} / W: ${config.allow_write ? 'Yes' : 'No'}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">
+                        ${server.type === 'google_sheet' ? `Google Sheet • R: ${config.allow_read ? 'Yes' : 'No'} / W: ${config.allow_write ? 'Yes' : 'No'}` : ''}
+                        ${server.type === 'whatsapp_catalog' ? `WhatsApp Catalog • Send: ${config.allow_send ? 'Yes' : 'No'}` : ''}
+                        ${server.type === 'whatsapp_flow' ? `WhatsApp Flow • Send: ${config.allow_send ? 'Yes' : 'No'}` : ''}
+                    </div>
                 </div>
             </div>
             <button class="icon-btn" onclick="deleteMcpServer(${server.id})"><i data-lucide="trash-2" size="16"></i></button>
@@ -280,6 +305,66 @@ function setupEventListeners() {
         }
     };
     
+    // WhatsApp Catalog Events
+    btnAddWhatsappCatalogMcp.onclick = () => {
+        if (!editingAgentId) return showToast('Please save the Agent first.', 'error');
+        mcpWhatsappCatalogModal.classList.remove('hidden');
+    };
+    const closeCatalogMcp = () => mcpWhatsappCatalogModal.classList.add('hidden');
+    closeCatalogMcpModal.onclick = closeCatalogMcp;
+    btnCancelMcpCatalog.onclick = closeCatalogMcp;
+
+    btnSaveMcpCatalog.onclick = async () => {
+        const name = mcpCatalogName.value.trim();
+        const catalog_id = mcpCatalogId.value.trim();
+        const allow_send = mcpCatalogSend.checked;
+
+        try {
+            const res = await fetch(`/api/agents/${editingAgentId}/mcp_servers/whatsapp-catalog`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, catalog_id, allow_send })
+            });
+            if (res.ok) {
+                showToast('Catalog Integration Added', 'success');
+                closeCatalogMcp();
+                mcpCatalogName.value = '';
+                mcpCatalogId.value = '';
+                loadMcpServers();
+            } else { showToast('Failed to add catalog integration', 'error'); }
+        } catch (e) { showToast('Network error', 'error'); }
+    };
+
+    // WhatsApp Flow Events
+    btnAddWhatsappFlowMcp.onclick = () => {
+        if (!editingAgentId) return showToast('Please save the Agent first.', 'error');
+        mcpWhatsappFlowModal.classList.remove('hidden');
+    };
+    const closeFlowMcp = () => mcpWhatsappFlowModal.classList.add('hidden');
+    closeFlowMcpModal.onclick = closeFlowMcp;
+    btnCancelMcpFlow.onclick = closeFlowMcp;
+
+    btnSaveMcpFlow.onclick = async () => {
+        const name = mcpFlowName.value.trim();
+        const flow_id = mcpFlowId.value.trim();
+        const allow_send = mcpFlowSend.checked;
+
+        try {
+            const res = await fetch(`/api/agents/${editingAgentId}/mcp_servers/whatsapp-flow`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, flow_id, allow_send })
+            });
+            if (res.ok) {
+                showToast('Flow Integration Added', 'success');
+                closeFlowMcp();
+                mcpFlowName.value = '';
+                mcpFlowId.value = '';
+                loadMcpServers();
+            } else { showToast('Failed to add flow integration', 'error'); }
+        } catch (e) { showToast('Network error', 'error'); }
+    };
+
     btnSaveAgent.onclick = async () => {
         saveAgentData();
     };

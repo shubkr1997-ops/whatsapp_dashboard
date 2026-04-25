@@ -56,6 +56,52 @@ router.post('/agents/:id/mcp_servers/google-sheet', async (req, res) => {
     }
 });
 
+router.post('/agents/:id/mcp_servers/whatsapp-catalog', async (req, res) => {
+    try {
+        const agentId = parseInt(req.params.id);
+        const { name, catalog_id, allow_send } = req.body;
+
+        const config_json = JSON.stringify({
+            catalog_id: catalog_id || null,
+            allow_send: !!allow_send
+        });
+
+        const server = await db.addMcpServer({
+            agent_config_id: agentId,
+            type: 'whatsapp_catalog',
+            name: name || 'WhatsApp Catalog',
+            config_json
+        });
+
+        res.status(201).json(server);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add WhatsApp Catalog: ' + err.message });
+    }
+});
+
+router.post('/agents/:id/mcp_servers/whatsapp-flow', async (req, res) => {
+    try {
+        const agentId = parseInt(req.params.id);
+        const { name, flow_id, allow_send } = req.body;
+
+        const config_json = JSON.stringify({
+            flow_id: flow_id || null,
+            allow_send: !!allow_send
+        });
+
+        const server = await db.addMcpServer({
+            agent_config_id: agentId,
+            type: 'whatsapp_flow',
+            name: name || 'WhatsApp Flow',
+            config_json
+        });
+
+        res.status(201).json(server);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add WhatsApp Flow: ' + err.message });
+    }
+});
+
 router.delete('/mcp_servers/:id', async (req, res) => {
     const id = parseInt(req.params.id);
     const server = await db.getMcpServerById(id);

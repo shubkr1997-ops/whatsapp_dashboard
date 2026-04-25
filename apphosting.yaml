@@ -17,6 +17,11 @@ env:
     availability:
       - RUNTIME
 
+  - variable: WHATSAPP_ACCESS_TOKEN
+    value: "EAAXzTNZAkfwMBREju57mcM5EZBV6pVoQNUGcLHNEZAK25io3bpmk9M4D6zQYDcJ4SC3vpdSTpRYlzOi3jV3evPWwBwXhHisciZCsWwKVnN9bPfjLMLX14t1QvNkzevfxasFXrF4c14iZBJBvYvXKpdZA4kyilZAD4MJdvns42VzLcAAEbEZA63EXAP3L4ZAZCUmWQK4gZDZD"
+    availability:
+      - RUNTIME
+
   - variable: WEBHOOK_VERIFY_TOKEN
     value: "my_super_secret_token_123"
     availability:
@@ -49,5 +54,15 @@ env:
 
   - variable: PUBLIC_URL
     value: https://whatsapp-dashboard--whatsappdashboard-bfa45.asia-southeast1.hosted.app
+    availability:
+      - RUNTIME
+
+  - variable: OLLAMA_BASE_URL
+    value: "http://localhost:11434"
+    availability:
+      - RUNTIME
+
+  - variable: OLLAMA_MODEL
+    value: "llama3:latest"
     availability:
       - RUNTIME

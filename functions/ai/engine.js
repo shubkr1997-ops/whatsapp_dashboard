@@ -143,7 +143,6 @@ async function processIncomingMessage(contactId, incomingText, contact, io, medi
             max_tokens: agentConfig.max_tokens,
             baseUrl: agentConfig.base_url,
             mcpServers: mcpServers,
-            contactPhone: contact.phone,
         });
 
         // Clear fallback timeout and stop typing indicator

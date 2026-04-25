@@ -11,10 +11,20 @@ const fs = require('fs');
 
 const admin = require('firebase-admin');
 if (!admin.apps.length) {
-    admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET
-    });
+    // In Cloud Run/Firebase App Hosting, use Application Default Credentials
+    if (process.env.NODE_ENV === 'production' || process.env.K_SERVICE) {
+        admin.initializeApp({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+        });
+    } else {
+        // Local development - use service account
+        admin.initializeApp({
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+            credential: admin.credential.cert(require('./service-account.json'))
+        });
+    }
 }
 
 const app = express();
@@ -27,6 +37,11 @@ const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const TRAINING_DIR = path.join(__dirname, 'training_files');
 fs.mkdirSync(TRAINING_DIR, { recursive: true });
+
+// Health check route for testing
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), environment: process.env.NODE_ENV });
+});
 
 // Routes
 app.use('/api', require('./src/routes/contacts.routes'));
@@ -41,7 +56,7 @@ app.use('/api', require('./src/routes/catalog.routes'));
 app.use('/api', require('./src/routes/flows.routes'));
 
 // Fallback
-app.get('/{*path}', (req, res) => {
+app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
